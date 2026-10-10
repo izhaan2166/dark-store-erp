@@ -88,6 +88,32 @@ DATABASE_URL_TEST=postgres://postgres:postgres@localhost:5432/erp_test pnpm test
 
 The concurrency tests fire 50 simultaneous orders at 10 units of stock and check that no more than 10 are ever reserved, that opposite lock orders do not deadlock, and that cancellations racing with new orders leave the ledger reconciled.
 
+## Checking stock records
+
+`reconcile` compares every balance with the movement ledger, reserved quantities with open allocations, and order lines with their allocations. It prints any difference and exits 1, so it can run as a nightly job.
+
+```bash
+DATABASE_URL=... pnpm --filter @dse/api reconcile --store DS01
+```
+
+## Load test
+
+The load test uses [k6](https://k6.io) against a separate database whose name contains `loadtest` or `staging`; the seed script refuses any other. It creates a store with 5,000 products, 200 stocked bins and 30 staff.
+
+```bash
+createdb erp_loadtest
+DATABASE_URL=postgres://…/erp_loadtest pnpm db:migrate
+LOADTEST_DATABASE_URL=postgres://…/erp_loadtest pnpm --filter @dse/api loadtest:seed   # prints the store code
+DATABASE_URL=postgres://…/erp_loadtest PORT=3001 node apps/api/dist/main.js             # plus dist/worker.js
+
+cd apps/api/loadtest
+k6 run -e API_URL=http://localhost:3001 k6.js                                          # normal: 120 orders/hour, 20 staff
+k6 run -e API_URL=http://localhost:3001 -e ORDERS_PER_HOUR=240 -e STAFF=30 k6.js       # stress
+DATABASE_URL=postgres://…/erp_loadtest pnpm --filter @dse/api reconcile --store LOAD-…
+```
+
+Each run lasts 15 minutes (`-e DURATION=…` to change). It passes when every screen's p95 is under 2 seconds, no request gets a server error, and `reconcile` finds no differences.
+
 ## Changing the schema
 
 Edit `packages/db/src/schema.ts`, then run `pnpm db:generate` and commit the new migration. CI fails if the schema and migrations disagree.
