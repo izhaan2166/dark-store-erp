@@ -49,7 +49,7 @@ Done when every shelf label and product barcode in the store scans to the right 
 The store starts from a full count, entered shelf by shelf as opening stock.
 
 1. Count each shelf: product, quantity, and for batch-tracked products the lot and expiry date.
-2. Enter each shelf's count as opening stock (`POST /stores/:storeId/opening-stock`, permission `inventory.opening_stock`, which Store Managers have). Each shelf can be loaded once; after that, corrections go through a stock count.
+2. Enter each shelf's count on the **Opening stock** screen (Store Managers have it): scan the shelf, scan or search each item and type how many, with the lot and expiry for batch-tracked items and the cost of one if known, then load it. Each shelf can be loaded once; after that, corrections go through Count stock.
 3. Run `reconcile` for the store.
 4. Spot-check ten shelves against the app's stock lookup.
 
