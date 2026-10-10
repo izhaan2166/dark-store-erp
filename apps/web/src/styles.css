@@ -55,6 +55,11 @@ fieldset { border: 1px solid var(--line); border-radius: 10px; }
 .card.warn { background: var(--amber-soft); }
 .tag { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; background: var(--green-soft); }
 .tag.warn { background: var(--amber-soft); }
+.card.late { border-color: var(--red); }
+.tag.late { background: var(--red-soft); color: var(--red); font-weight: 600; }
+.card .title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.card > .muted { display: block; margin-top: 4px; }
+.card .jobs { margin-top: 12px; }
 
 .list { list-style: none; padding: 0; margin: 0; }
 .row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 14px 4px;
@@ -75,6 +80,11 @@ fieldset { border: 1px solid var(--line); border-radius: 10px; }
 
 .dialog { position: fixed; inset: 0; background: #0008; display: flex; align-items: flex-end; justify-content: center; }
 .dialog form { background: #fff; width: 100%; max-width: 520px; padding: 20px 16px 28px; border-radius: 16px 16px 0 0; }
+.dialog .sheet { background: #fff; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto;
+  padding: 20px 16px 28px; border-radius: 16px 16px 0 0; }
+.dialog .sheet form { padding: 0; border-radius: 0; }
+.search { display: flex; gap: 8px; }
+.search input { flex: 1; }
 .actions { display: flex; gap: 12px; justify-content: flex-end; }
 
 .jobs { display: flex; flex-wrap: wrap; gap: 10px; }

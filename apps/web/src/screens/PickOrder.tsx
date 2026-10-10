@@ -234,14 +234,16 @@ function ShortPickDialog(props: {
   onSubmit: (quantity: number, reason: string) => void;
 }) {
   const { stop } = props;
-  const [quantity, setQuantity] = useState(stop.task.quantity);
+  const [quantityText, setQuantityText] = useState(String(stop.task.quantity));
+  const quantity = Number(quantityText);
+  const validQuantity = Number.isInteger(quantity) && quantity >= 1 && quantity <= stop.task.quantity;
   const [reason, setReason] = useState(SHORT_REASONS[0]!);
   const [other, setOther] = useState("");
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const why = reason === "Other" ? other.trim() : reason;
-    if (why) props.onSubmit(quantity, why);
+    if (why && validQuantity) props.onSubmit(quantity, why);
   };
 
   return (
@@ -256,8 +258,9 @@ function ShortPickDialog(props: {
             type="number"
             min={1}
             max={stop.task.quantity}
-            value={quantity}
-            onChange={(e) => setQuantity(Math.max(1, Math.min(stop.task.quantity, Number(e.target.value) || 1)))}
+            step={1}
+            value={quantityText}
+            onChange={(e) => setQuantityText(e.target.value)}
           />
         </label>
         <fieldset>
@@ -274,7 +277,7 @@ function ShortPickDialog(props: {
           <button type="button" onClick={props.onCancel}>
             Cancel
           </button>
-          <button className="primary" disabled={props.busy}>
+          <button className="primary" disabled={props.busy || !validQuantity}>
             Report missing
           </button>
         </div>

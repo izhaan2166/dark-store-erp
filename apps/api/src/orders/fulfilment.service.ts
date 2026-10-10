@@ -126,6 +126,7 @@ export interface OpenShortage {
   orderItemId: string;
   productId: string;
   sku: string;
+  name: string;
   source: string;
   quantity: number;
   createdAt: Date;
@@ -604,6 +605,7 @@ export class FulfilmentService {
         orderItemId: orderItems.id,
         productId: products.id,
         sku: products.sku,
+        name: products.name,
         source: orderItemShortages.source,
         quantity: orderItemShortages.quantity,
         createdAt: orderItemShortages.createdAt,

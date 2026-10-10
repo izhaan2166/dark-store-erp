@@ -8,6 +8,7 @@ describe("routes", () => {
       { screen: "queue", job: "pick", storeId: "s1" },
       { screen: "queue", job: "pack", storeId: "s1" },
       { screen: "order", job: "pack", storeId: "s1", orderId: "o1" },
+      { screen: "shortages", storeId: "s1" },
     ] as const;
     for (const route of routes) expect(parseRoute(href(route))).toEqual(route);
   });

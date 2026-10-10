@@ -4,6 +4,7 @@ import { useRoute } from "./route";
 import { OrderQueue } from "./screens/OrderQueue";
 import { PackOrder } from "./screens/PackOrder";
 import { PickOrder } from "./screens/PickOrder";
+import { Shortages } from "./screens/Shortages";
 import { SignIn } from "./screens/SignIn";
 import { Stores } from "./screens/Stores";
 import { loadSession, saveSession } from "./session";
@@ -30,7 +31,9 @@ export function App() {
   }
 
   const store = "storeId" in route ? session.stores.find((s) => s.storeId === route.storeId) : undefined;
-  const allowed = "job" in route && (store?.permissions.includes(route.job === "pick" ? "orders.pick" : "orders.pack") ?? false);
+  const needs =
+    route.screen === "shortages" ? "orders.resolve_shortage" : "job" in route ? (route.job === "pick" ? "orders.pick" : "orders.pack") : null;
+  const allowed = needs !== null && (store?.permissions.includes(needs) ?? false);
 
   return (
     <>
@@ -43,6 +46,8 @@ export function App() {
       </div>
       {route.screen === "stores" || !allowed ? (
         <Stores session={session} />
+      ) : route.screen === "shortages" ? (
+        <Shortages api={api} storeId={route.storeId} />
       ) : route.screen === "queue" ? (
         <OrderQueue key={route.job} api={api} storeId={route.storeId} job={route.job} />
       ) : route.job === "pick" ? (
