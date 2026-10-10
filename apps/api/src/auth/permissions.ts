@@ -7,6 +7,7 @@ export const PERMISSIONS = [
   "catalog.manage",
   "locations.manage",
   "inventory.view",
+  "dashboard.view",
   "orders.view",
   "orders.create",
   "orders.cancel",
@@ -35,6 +36,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   store_manager: PERMISSIONS,
   inventory_manager: [
     "catalog.view",
+    "dashboard.view",
     "catalog.manage",
     "locations.manage",
     "inventory.view",
@@ -49,7 +51,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   receiving_staff: ["catalog.view", "inventory.view", "purchasing.view", "receiving.record", "inventory.putaway"],
   picker: ["catalog.view", "inventory.view", "orders.view", "orders.pick"],
   packer: ["catalog.view", "inventory.view", "orders.view", "orders.pack"],
-  auditor: ["catalog.view", "inventory.view", "orders.view", "purchasing.view"],
+  auditor: ["catalog.view", "dashboard.view", "inventory.view", "orders.view", "purchasing.view"],
 };
 
 export function rolesGrant(roles: readonly Role[], permission: Permission): boolean {

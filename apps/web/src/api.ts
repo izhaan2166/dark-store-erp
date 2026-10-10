@@ -124,6 +124,54 @@ export type Resolution =
   | { resolution: "remove"; reason: string }
   | { resolution: "substitute"; reason: string; substituteProductId: string; quantity: number };
 
+export interface Dashboard {
+  today: string;
+  expiryAlertDays: number;
+  kpis: {
+    handedOverToday: number;
+    medianFulfilmentMinutes: number | null;
+    awaitingFulfilment: number;
+    outOfStock: number;
+    expiryAlerts: number;
+  };
+  exceptions: {
+    openShortages: number;
+    escalatedShortages: number;
+    receiptsAwaitingApproval: number;
+    countsAwaitingApproval: number;
+    requestsAwaitingApproval: number;
+    unitsAwaitingPutaway: number;
+    problemOrders: number;
+  };
+}
+
+export interface HandedOverRow {
+  orderId: string;
+  externalRef: string;
+  createdAt: string;
+  handedOverAt: string;
+  minutes: number;
+}
+
+export interface OutOfStockRow {
+  productId: string;
+  sku: string;
+  name: string;
+  openShortageUnits: number;
+}
+
+export interface ExpiringRow {
+  productId: string;
+  sku: string;
+  name: string;
+  batchId: string;
+  lotCode: string;
+  expiryDate: string;
+  locationCode: string;
+  status: string;
+  onHand: number;
+}
+
 export interface Supplier {
   supplierId: string;
   code: string;
@@ -386,6 +434,22 @@ export class Api {
 
   purchaseOrders(storeId: string): Promise<PurchaseOrderSummary[]> {
     return this.call("GET", `/stores/${storeId}/purchase-orders?status=open`);
+  }
+
+  dashboard(storeId: string): Promise<Dashboard> {
+    return this.call("GET", `/stores/${storeId}/dashboard`);
+  }
+
+  handedOverToday(storeId: string): Promise<HandedOverRow[]> {
+    return this.call("GET", `/stores/${storeId}/dashboard/handed-over`);
+  }
+
+  outOfStock(storeId: string): Promise<OutOfStockRow[]> {
+    return this.call("GET", `/stores/${storeId}/dashboard/out-of-stock`);
+  }
+
+  expiring(storeId: string): Promise<ExpiringRow[]> {
+    return this.call("GET", `/stores/${storeId}/dashboard/expiring`);
   }
 
   suppliers(storeId: string): Promise<Supplier[]> {
