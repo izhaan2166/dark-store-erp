@@ -123,7 +123,7 @@ describe("shortage escalation", () => {
     await ctx.jobs.escalateShortages(queueStore.storeId);
     const queue = await ctx.fulfilment.openShortages(queueStore.storeId);
     expect(queue.map((s) => s.shortageId)).toEqual([escalated.shortageId, older.shortageId]);
-    expect(queue[0]).toMatchObject({ orderId: escalated.order.orderId, source: "reservation", quantity: 2 });
+    expect(queue[0]).toMatchObject({ orderId: escalated.order.orderId, source: "reservation", quantity: 2, name: "Test product" });
     expect(queue[0]!.escalatedAt).not.toBeNull();
     expect(queue[1]!.escalatedAt).toBeNull();
   });

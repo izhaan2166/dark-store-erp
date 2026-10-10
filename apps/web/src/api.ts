@@ -65,6 +65,31 @@ export interface Product {
   name: string;
 }
 
+export interface OpenShortage {
+  shortageId: string;
+  orderId: string;
+  externalRef: string;
+  orderStatus: string;
+  orderItemId: string;
+  productId: string;
+  sku: string;
+  name: string;
+  source: string;
+  quantity: number;
+  createdAt: string;
+  escalatedAt: string | null;
+}
+
+export interface ProductStock {
+  productId: string;
+  availableToPromise: number;
+}
+
+export type Resolution =
+  | { resolution: "reallocate"; reason: string }
+  | { resolution: "remove"; reason: string }
+  | { resolution: "substitute"; reason: string; substituteProductId: string; quantity: number };
+
 /** An error the API explained, e.g. `wrong_item` or `insufficient_stock`. */
 export class ApiError extends Error {
   constructor(
@@ -131,6 +156,25 @@ export class Api {
 
   completePicking(storeId: string, orderId: string, key: string): Promise<FulfilmentView> {
     return this.call("POST", `/stores/${storeId}/orders/${orderId}/complete-picking`, { key });
+  }
+
+  shortages(storeId: string): Promise<OpenShortage[]> {
+    return this.call("GET", `/stores/${storeId}/shortages`);
+  }
+
+  resolveShortage(storeId: string, orderId: string, shortageId: string, body: Resolution, key: string): Promise<FulfilmentView> {
+    return this.call("POST", `/stores/${storeId}/orders/${orderId}/shortages/${shortageId}/resolve`, { body, key });
+  }
+
+  searchProducts(storeId: string, q: string): Promise<Product[]> {
+    return this.call<{ items: Product[] }>(
+      "GET",
+      `/stores/${storeId}/products?status=active&limit=10&q=${encodeURIComponent(q)}`,
+    ).then((r) => r.items);
+  }
+
+  stock(storeId: string, productId: string): Promise<ProductStock> {
+    return this.call("GET", `/stores/${storeId}/inventory/products/${productId}`);
   }
 
   pack(storeId: string, orderId: string, lines: { orderItemId: string; quantity: number }[], key: string): Promise<FulfilmentView> {

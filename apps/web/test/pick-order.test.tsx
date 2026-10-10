@@ -108,6 +108,23 @@ describe("pick order screen", () => {
     expect(screen.getByRole("button", { name: "Finish picking" })).toBeInTheDocument();
   });
 
+  it("lets the picker retype how many are missing, within what the bin should hold", async () => {
+    const shortPick = vi.fn().mockResolvedValue(view());
+    render(<PickOrder api={fakeApi({ shortPick })} storeId="s1" orderId="order-1" />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Can't find" }));
+    const howMany = screen.getByLabelText("How many are missing?");
+    const report = screen.getByRole("button", { name: "Report missing" });
+    await user.clear(howMany);
+    expect(report).toBeDisabled();
+    await user.type(howMany, "3");
+    expect(report).toBeDisabled();
+    await user.clear(howMany);
+    await user.type(howMany, "1");
+    await user.click(report);
+    await waitFor(() => expect(shortPick).toHaveBeenCalledWith("s1", "order-1", expect.objectContaining({ quantity: 1 }), expect.any(String)));
+  });
+
   it("starts an accepted order before scanning", async () => {
     const startPicking = vi.fn().mockResolvedValue(view());
     render(<PickOrder api={fakeApi({ fulfilment: vi.fn().mockResolvedValue(view({ status: "accepted" })), startPicking })} storeId="s1" orderId="order-1" />);
