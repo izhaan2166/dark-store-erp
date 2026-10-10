@@ -130,6 +130,8 @@ export const storeSettings = pgTable(
       .notNull()
       .default(100_000),
     receivingVariancePct: integer("receiving_variance_pct").notNull().default(5),
+    /** Stock expiring within this many days shows as an expiry alert on the dashboard. */
+    expiryAlertDays: integer("expiry_alert_days").notNull().default(3),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -138,7 +140,8 @@ export const storeSettings = pgTable(
       AND ${t.sellByCutoffDays} >= 0
       AND ${t.countVarianceQtyThreshold} >= 0
       AND ${t.countVarianceValueThresholdPaise} >= 0
-      AND ${t.receivingVariancePct} >= 0`),
+      AND ${t.receivingVariancePct} >= 0
+      AND ${t.expiryAlertDays} >= 0`),
   ],
 );
 

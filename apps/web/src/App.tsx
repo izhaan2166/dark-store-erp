@@ -15,6 +15,7 @@ import { Shelves } from "./screens/Shelves";
 import { Shortages } from "./screens/Shortages";
 import { SignIn } from "./screens/SignIn";
 import { Approvals } from "./screens/Approvals";
+import { Dashboard } from "./screens/Dashboard";
 import { CountShelf, CountStart } from "./screens/StockCount";
 import { StockControl } from "./screens/StockControl";
 import { Stores } from "./screens/Stores";
@@ -72,6 +73,8 @@ export function App() {
         <Approvals api={api} storeId={route.storeId} />
       ) : route.screen === "stock" ? (
         <StockControl api={api} storeId={route.storeId} />
+      ) : route.screen === "dashboard" ? (
+        <Dashboard api={api} storeId={route.storeId} permissions={store?.permissions ?? []} />
       ) : route.screen === "orders" ? (
         <Orders api={api} storeId={route.storeId} canCancel={store?.permissions.includes("orders.cancel") ?? false} />
       ) : route.screen === "new-order" ? (
