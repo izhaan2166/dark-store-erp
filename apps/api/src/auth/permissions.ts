@@ -22,6 +22,7 @@ export const PERMISSIONS = [
   "inventory.approve_count",
   "inventory.adjust",
   "inventory.approve_request",
+  "inventory.opening_stock",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
