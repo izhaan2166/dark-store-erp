@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { Api, type Session } from "./api";
 import { useRoute } from "./route";
+import { OrderQueue } from "./screens/OrderQueue";
+import { PackOrder } from "./screens/PackOrder";
 import { PickOrder } from "./screens/PickOrder";
-import { PickQueue } from "./screens/PickQueue";
 import { SignIn } from "./screens/SignIn";
 import { Stores } from "./screens/Stores";
 import { loadSession, saveSession } from "./session";
@@ -29,7 +30,7 @@ export function App() {
   }
 
   const store = "storeId" in route ? session.stores.find((s) => s.storeId === route.storeId) : undefined;
-  const canPick = store?.permissions.includes("orders.pick") ?? false;
+  const allowed = "job" in route && (store?.permissions.includes(route.job === "pick" ? "orders.pick" : "orders.pack") ?? false);
 
   return (
     <>
@@ -40,12 +41,14 @@ export function App() {
         </span>
         <button onClick={() => void api.logout().catch(() => {}).finally(signOut)}>Sign out</button>
       </div>
-      {route.screen === "stores" || !canPick ? (
+      {route.screen === "stores" || !allowed ? (
         <Stores session={session} />
       ) : route.screen === "queue" ? (
-        <PickQueue api={api} storeId={route.storeId} />
-      ) : (
+        <OrderQueue key={route.job} api={api} storeId={route.storeId} job={route.job} />
+      ) : route.job === "pick" ? (
         <PickOrder key={route.orderId} api={api} storeId={route.storeId} orderId={route.orderId} />
+      ) : (
+        <PackOrder key={route.orderId} api={api} storeId={route.storeId} orderId={route.orderId} />
       )}
     </>
   );

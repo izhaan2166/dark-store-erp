@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { type Api, ApiError, type FulfilmentLine, type FulfilmentView, newKey, type PickTask } from "../api";
 import { href } from "../route";
+import { buzz } from "../buzz";
 import { ScanBox } from "../ScanBox";
 
 type Message = { kind: "ok" | "error"; text: string };
@@ -18,14 +19,6 @@ export function stops(view: FulfilmentView): Stop[] {
         (a.task.expiryDate ?? "9999").localeCompare(b.task.expiryDate ?? "9999") ||
         a.line.lineNo - b.line.lineNo,
     );
-}
-
-function buzz(): void {
-  try {
-    navigator.vibrate?.([120, 60, 120]);
-  } catch {
-    // Not every device can vibrate.
-  }
 }
 
 /**
@@ -183,7 +176,7 @@ export function PickOrder(props: { api: Api; storeId: string; orderId: string })
 
       {view.status !== "accepted" && view.status !== "picking" && (
         <p className="ok">
-          This order is {view.status.replaceAll("_", " ")}. <a href={href({ screen: "queue", storeId })}>Back to orders</a>
+          This order is {view.status.replaceAll("_", " ")}. <a href={href({ screen: "queue", job: "pick", storeId })}>Back to orders</a>
         </p>
       )}
 
@@ -228,7 +221,7 @@ export function PickOrder(props: { api: Api; storeId: string; orderId: string })
 function Header(props: { storeId: string }) {
   return (
     <header className="bar">
-      <a href={href({ screen: "queue", storeId: props.storeId })}>‹ Orders</a>
+      <a href={href({ screen: "queue", job: "pick", storeId: props.storeId })}>‹ Orders</a>
       <h1>Pick order</h1>
     </header>
   );
