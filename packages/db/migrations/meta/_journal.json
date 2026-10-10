@@ -50,6 +50,13 @@
       "when": 1791653644149,
       "tag": "0006_stock_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791654028985,
+      "tag": "0007_worker_jobs",
+      "breakpoints": true
     }
   ]
 }

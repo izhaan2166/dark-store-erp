@@ -5,7 +5,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
+    "worker": "node dist/worker.js",
     "dev": "tsx watch src/main.ts",
+    "dev:worker": "tsx watch src/worker.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "create-user": "node dist/cli/create-user.js"

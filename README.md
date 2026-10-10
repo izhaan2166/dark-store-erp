@@ -22,7 +22,10 @@ cp .env.example .env            # then point DATABASE_URL at your database
 pnpm db:migrate                 # apply migrations to DATABASE_URL
 pnpm build
 node apps/api/dist/main.js      # GET /health reports API and database status
+node apps/api/dist/worker.js    # background jobs: shortage escalation, expiry sweep
 ```
+
+The worker runs every job once a minute (`WORKER_INTERVAL_MS` to change it). Running two workers is safe.
 
 Create the first user (and the store, if it does not exist yet):
 
@@ -56,6 +59,7 @@ Sign in with `POST /auth/login` (`{ "email", "password" }`) and send the returne
 | `POST /stores/:storeId/orders/:orderId/cancel` (`{ "reason" }`) | `orders.cancel` |
 | `GET /stores/:storeId/orders/:orderId/fulfilment` (pick list, progress, open shortages) | `orders.view` |
 | `POST …/orders/:orderId/start-picking` · `/picks` · `/short-picks` · `/complete-picking` | `orders.pick` |
+| `GET /stores/:storeId/shortages` (open shortages across the store, escalated first) | `orders.view` |
 | `POST …/orders/:orderId/shortages/:shortageId/resolve` (`{ "resolution": "reallocate" \| "remove", "reason" }`) | `orders.resolve_shortage` |
 | `POST …/orders/:orderId/pack` · `/handover` | `orders.pack` |
 | `POST /stores/:storeId/suppliers` | `purchasing.manage` |

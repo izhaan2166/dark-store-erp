@@ -44,6 +44,13 @@ Frozen on 10 Oct 2026. Change them only when implementation or testing shows a r
 ## Shortages and timeouts
 
 - A shortage still open after `store_settings.shortage_escalation_minutes` (default 15) escalates the order to the Store Manager. It does not cancel.
+- The worker checks once a minute. Escalation stamps `escalated_at` on each overdue shortage (once), writes an `order.shortage_escalated` outbox event and an audit record, and puts the shortage at the top of the store's shortage queue. The order's status does not change.
+- Background jobs act as a fixed system user (`SYSTEM_USER_ID`, seeded by migration) that has no password and no roles.
+
+## Expiry
+
+- A batch is expired from its expiry date onwards, in the store's time zone. The worker's expiry sweep first releases any reservation on expired `available` units and opens an `expired` shortage for each affected order line, then moves every free expired unit from `available` to `expired` in the same location. Expired units can only be written off.
+- Units already picked into a packing location are left alone; the packer is the last check.
 - Automatic cancellation is off (`auto_cancel_enabled = false`). When enabled later, the order waits in `cancel_pending` until the order source confirms; failures go to `exception` and release nothing.
 - Timeout jobs act through compare-and-set transitions that name the state they observed (see [state-machines.md](state-machines.md)).
 

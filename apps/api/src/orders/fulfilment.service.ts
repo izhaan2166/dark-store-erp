@@ -8,6 +8,7 @@ import {
   orders,
   outboxEvents,
   productBarcodes,
+  products,
   stockReservations,
   type DbExecutor,
   type DbHandle,
@@ -92,7 +93,28 @@ export interface FulfilmentView {
   orderId: string;
   status: OrderStatus;
   lines: FulfilmentLine[];
-  openShortages: { shortageId: string; orderItemId: string; source: string; quantity: number }[];
+  openShortages: {
+    shortageId: string;
+    orderItemId: string;
+    source: string;
+    quantity: number;
+    /** When the shortage passed the store's escalation time; null until then. */
+    escalatedAt: Date | null;
+  }[];
+}
+
+export interface OpenShortage {
+  shortageId: string;
+  orderId: string;
+  externalRef: string;
+  orderStatus: OrderStatus;
+  orderItemId: string;
+  productId: string;
+  sku: string;
+  source: string;
+  quantity: number;
+  createdAt: Date;
+  escalatedAt: Date | null;
 }
 
 type OpenAllocation = {
@@ -463,6 +485,7 @@ export class FulfilmentService {
         orderItemId: orderItemShortages.orderItemId,
         source: orderItemShortages.source,
         quantity: orderItemShortages.quantity,
+        escalatedAt: orderItemShortages.escalatedAt,
       })
       .from(orderItemShortages)
       .innerJoin(orderItems, eq(orderItems.id, orderItemShortages.orderItemId))
@@ -478,6 +501,31 @@ export class FulfilmentService {
       })),
       openShortages: shortages,
     };
+  }
+
+  /** The Store Manager's queue: every open shortage in the store, escalated ones first, oldest first. */
+  async openShortages(storeId: string): Promise<OpenShortage[]> {
+    return this.handle.db
+      .select({
+        shortageId: orderItemShortages.id,
+        orderId: orders.id,
+        externalRef: orders.externalRef,
+        orderStatus: orders.status,
+        orderItemId: orderItems.id,
+        productId: products.id,
+        sku: products.sku,
+        source: orderItemShortages.source,
+        quantity: orderItemShortages.quantity,
+        createdAt: orderItemShortages.createdAt,
+        escalatedAt: orderItemShortages.escalatedAt,
+      })
+      .from(orderItemShortages)
+      .innerJoin(orderItems, eq(orderItems.id, orderItemShortages.orderItemId))
+      .innerJoin(orders, eq(orders.id, orderItems.orderId))
+      .innerJoin(products, eq(products.id, orderItems.productId))
+      .where(and(eq(orders.storeId, storeId), eq(orderItemShortages.status, "open")))
+      .orderBy(sql`${orderItemShortages.escalatedAt} IS NULL`, asc(orderItemShortages.createdAt))
+      .limit(500);
   }
 
   /** Runs one fulfilment step: retried on deadlock, at most once per idempotency key. */
