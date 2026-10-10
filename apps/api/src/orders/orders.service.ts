@@ -73,7 +73,24 @@ export interface CancelOrderResult {
   releasedQty: number;
 }
 
-interface Actor {
+export interface OrderView {
+  orderId: string;
+  externalRef: string;
+  status: string;
+  createdAt: string;
+  lines: {
+    orderItemId: string;
+    lineNo: number;
+    productId: string;
+    requestedQty: number;
+    reservedQty: number;
+    pickedQty: number;
+    fulfilledQty: number;
+    openShortageQty: number;
+  }[];
+}
+
+export interface Actor {
   storeId: string;
   actorUserId: string;
   idempotencyKey: string;
@@ -281,6 +298,35 @@ export class OrdersService {
     });
 
     return result;
+  }
+
+  /** Current state of one order in the store, with each line's quantities. */
+  async getOrder(storeId: string, orderId: string): Promise<OrderView> {
+    const { db } = this.handle;
+    const [order] = await db
+      .select({ id: orders.id, externalRef: orders.externalRef, status: orders.status, createdAt: orders.createdAt })
+      .from(orders)
+      .where(and(eq(orders.id, orderId), eq(orders.storeId, storeId)));
+    if (!order) throw new NotFoundError("Order not found", { orderId });
+
+    const lines = await db
+      .select({
+        orderItemId: orderItems.id,
+        lineNo: orderItems.lineNo,
+        productId: orderItems.productId,
+        requestedQty: orderItems.requestedQty,
+        reservedQty: orderItems.reservedQty,
+        pickedQty: orderItems.pickedQty,
+        fulfilledQty: orderItems.fulfilledQty,
+        openShortageQty: sql<number>`coalesce((
+          SELECT sum(s.quantity) FROM order_item_shortages s
+          WHERE s.order_item_id = ${orderItems.id} AND s.status = 'open'), 0)::int`,
+      })
+      .from(orderItems)
+      .where(eq(orderItems.orderId, orderId))
+      .orderBy(orderItems.lineNo);
+
+    return { orderId: order.id, externalRef: order.externalRef, status: order.status, createdAt: order.createdAt.toISOString(), lines };
   }
 
   /**

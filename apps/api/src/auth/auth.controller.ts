@@ -1,0 +1,29 @@
+import { Body, Controller, Get, HttpCode, Inject, Post } from "@nestjs/common";
+import { AuthService, type AuthUser, type LoginRequest } from "./auth.service";
+import { CurrentUser, Public } from "./decorators";
+
+@Controller("auth")
+export class AuthController {
+  constructor(@Inject(AuthService) private readonly auth: AuthService) {}
+
+  @Public()
+  @Post("login")
+  @HttpCode(200)
+  login(@Body() body: LoginRequest) {
+    return this.auth.login(body);
+  }
+
+  @Post("logout")
+  @HttpCode(204)
+  async logout(@CurrentUser() user: AuthUser): Promise<void> {
+    await this.auth.logout(user);
+  }
+
+  @Get("me")
+  me(@CurrentUser() user: AuthUser) {
+    return {
+      user: { id: user.userId, email: user.email, name: user.name },
+      stores: [...user.storeRoles].map(([storeId, roles]) => ({ storeId, roles })),
+    };
+  }
+}

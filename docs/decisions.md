@@ -10,6 +10,12 @@ Frozen on 10 Oct 2026. Change them only when implementation or testing shows a r
 - Scanning: keyboard-wedge USB/Bluetooth scanners from day one; camera scanning only if phones or tablets are used in the pilot. **Open:** which real devices the pilot uses, to be tested in Week 1.
 - One developer working with Claude; 8 weeks is a target, and phase gates outrank the calendar.
 
+## Sign-in and permissions
+
+- Email and password sign-in. Passwords are hashed with scrypt; the API returns an opaque bearer token and stores only its SHA-256 hash. Sessions last 12 hours and can be revoked.
+- Roles (Super Admin, Store Manager, Inventory Manager, Receiving Staff, Picker, Packer, Auditor) are granted per store, and one person may hold several. Each role maps to permissions in code; the backend checks them on every request and reads roles fresh each time, so removing a role takes effect immediately.
+- Every route is private unless marked public. A route under `/stores/:storeId` must declare a permission or it is refused. A user with no role in a store gets `404`, the same as a store that does not exist.
+
 ## Inventory model
 
 - `inventory_movements` is the authoritative, append-only record of physical stock changes. A trigger blocks UPDATE and DELETE; corrections are reversal movements.
