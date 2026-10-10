@@ -19,6 +19,7 @@ describe("routes", () => {
       { screen: "shelf", storeId: "s1", locationId: "a1" },
       { screen: "products", storeId: "s1" },
       { screen: "shelves", storeId: "s1" },
+      { screen: "opening-stock", storeId: "s1" },
     ] as const;
     for (const route of routes) expect(parseRoute(href(route))).toEqual(route);
   });
@@ -40,5 +41,6 @@ describe("routes", () => {
     expect(permissionFor({ screen: "stock", storeId: "s1" })).toBe("inventory.adjust");
     expect(permissionFor({ screen: "products", storeId: "s1" })).toBe("catalog.manage");
     expect(permissionFor({ screen: "shelves", storeId: "s1" })).toBe("locations.manage");
+    expect(permissionFor({ screen: "opening-stock", storeId: "s1" })).toBe("inventory.opening_stock");
   });
 });
