@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { batches, createDb, locations, products, storeSettings, stores, users, type DbHandle } from "@dse/db";
+import { CatalogService } from "../../src/catalog/catalog.service";
 import { LedgerService } from "../../src/inventory/ledger.service";
 import { ReconciliationService } from "../../src/inventory/reconciliation.service";
 import { OrdersService } from "../../src/orders/orders.service";
@@ -14,6 +15,7 @@ export interface TestContext {
   reconciliation: ReconciliationService;
   purchasing: PurchasingService;
   receiving: ReceivingService;
+  catalog: CatalogService;
 }
 
 export function createContext(poolSize = 60): TestContext {
@@ -24,6 +26,7 @@ export function createContext(poolSize = 60): TestContext {
     ledger,
     purchasing: new PurchasingService(handle),
     receiving: new ReceivingService(handle, ledger),
+    catalog: new CatalogService(handle),
     orders: new OrdersService(handle),
     reconciliation: new ReconciliationService(handle),
   };

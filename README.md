@@ -9,7 +9,7 @@ The build plan and every agreed decision live in [docs/decisions.md](docs/decisi
 | Path | What it is |
 | --- | --- |
 | `packages/db` | Drizzle schema, SQL migrations and the migration runner |
-| `apps/api` | NestJS API: sign-in and roles, inventory ledger, receiving, reservations, orders |
+| `apps/api` | NestJS API: sign-in and roles, products and locations, inventory ledger, receiving, reservations, orders |
 | `docs` | Decisions, state machines and other design notes |
 
 ## Getting started
@@ -38,6 +38,11 @@ Sign in with `POST /auth/login` (`{ "email", "password" }`) and send the returne
 
 | Endpoint | Permission |
 | --- | --- |
+| `GET /stores/:storeId/products?q=` · `GET …/products/:productId` · `GET …/barcodes/:barcode` | `catalog.view` |
+| `POST /stores/:storeId/products` · `PATCH …/products/:productId` · `POST …/products/:productId/barcodes` | `catalog.manage` |
+| `GET /stores/:storeId/locations` | `catalog.view` |
+| `POST /stores/:storeId/locations` · `PATCH …/locations/:locationId` | `locations.manage` |
+| `GET /stores/:storeId/inventory?productId=&locationId=&status=` · `GET …/inventory/products/:productId` | `inventory.view` |
 | `POST /stores/:storeId/orders` | `orders.create` |
 | `GET /stores/:storeId/orders/:orderId` | `orders.view` |
 | `POST /stores/:storeId/orders/:orderId/cancel` (`{ "reason" }`) | `orders.cancel` |
