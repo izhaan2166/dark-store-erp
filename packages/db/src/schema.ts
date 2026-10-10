@@ -333,6 +333,8 @@ export const orders = pgTable(
       .references(() => stores.id),
     externalRef: text("external_ref").notNull(),
     status: orderStatus("status").notNull().default("accepted"),
+    /** Where this order's picked units wait; set by the first pick. */
+    packingLocationId: uuid("packing_location_id").references(() => locations.id),
     createdBy: uuid("created_by")
       .notNull()
       .references(() => users.id),

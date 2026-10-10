@@ -46,6 +46,10 @@ Sign in with `POST /auth/login` (`{ "email", "password" }`) and send the returne
 | `POST /stores/:storeId/orders` | `orders.create` |
 | `GET /stores/:storeId/orders/:orderId` | `orders.view` |
 | `POST /stores/:storeId/orders/:orderId/cancel` (`{ "reason" }`) | `orders.cancel` |
+| `GET /stores/:storeId/orders/:orderId/fulfilment` (pick list, progress, open shortages) | `orders.view` |
+| `POST …/orders/:orderId/start-picking` · `/picks` · `/short-picks` · `/complete-picking` | `orders.pick` |
+| `POST …/orders/:orderId/shortages/:shortageId/resolve` (`{ "resolution": "reallocate" \| "remove", "reason" }`) | `orders.resolve_shortage` |
+| `POST …/orders/:orderId/pack` · `/handover` | `orders.pack` |
 | `POST /stores/:storeId/suppliers` | `purchasing.manage` |
 | `POST /stores/:storeId/purchase-orders` | `purchasing.manage` |
 | `GET /stores/:storeId/purchase-orders/:purchaseOrderId` | `purchasing.view` |

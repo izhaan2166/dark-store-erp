@@ -10,6 +10,9 @@ export const PERMISSIONS = [
   "orders.view",
   "orders.create",
   "orders.cancel",
+  "orders.pick",
+  "orders.pack",
+  "orders.resolve_shortage",
   "purchasing.view",
   "purchasing.manage",
   "receiving.record",
@@ -37,8 +40,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "inventory.putaway",
   ],
   receiving_staff: ["catalog.view", "inventory.view", "purchasing.view", "receiving.record", "inventory.putaway"],
-  picker: ["catalog.view", "inventory.view", "orders.view"],
-  packer: ["catalog.view", "inventory.view", "orders.view"],
+  picker: ["catalog.view", "inventory.view", "orders.view", "orders.pick"],
+  packer: ["catalog.view", "inventory.view", "orders.view", "orders.pack"],
   auditor: ["catalog.view", "inventory.view", "orders.view", "purchasing.view"],
 };
 

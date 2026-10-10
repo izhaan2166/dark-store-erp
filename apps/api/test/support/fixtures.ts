@@ -3,6 +3,7 @@ import { batches, createDb, locations, products, storeSettings, stores, users, t
 import { CatalogService } from "../../src/catalog/catalog.service";
 import { LedgerService } from "../../src/inventory/ledger.service";
 import { ReconciliationService } from "../../src/inventory/reconciliation.service";
+import { FulfilmentService } from "../../src/orders/fulfilment.service";
 import { OrdersService } from "../../src/orders/orders.service";
 import { PurchasingService } from "../../src/receiving/purchasing.service";
 import { ReceivingService } from "../../src/receiving/receiving.service";
@@ -16,6 +17,7 @@ export interface TestContext {
   purchasing: PurchasingService;
   receiving: ReceivingService;
   catalog: CatalogService;
+  fulfilment: FulfilmentService;
 }
 
 export function createContext(poolSize = 60): TestContext {
@@ -27,6 +29,7 @@ export function createContext(poolSize = 60): TestContext {
     purchasing: new PurchasingService(handle),
     receiving: new ReceivingService(handle, ledger),
     catalog: new CatalogService(handle),
+    fulfilment: new FulfilmentService(handle, ledger),
     orders: new OrdersService(handle),
     reconciliation: new ReconciliationService(handle),
   };

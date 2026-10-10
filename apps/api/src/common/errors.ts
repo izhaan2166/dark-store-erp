@@ -67,3 +67,15 @@ export class ConflictError extends DomainError {
   readonly code = "conflict";
   readonly httpStatus = 409;
 }
+
+/** A scan does not match the product on the order line. */
+export class WrongItemError extends DomainError {
+  readonly code = "wrong_item";
+  readonly httpStatus = 422;
+}
+
+/** A fulfilment step is blocked by a gate, e.g. open shortages before packing. */
+export class FulfilmentBlockedError extends DomainError {
+  readonly code = "fulfilment_blocked";
+  readonly httpStatus = 409;
+}

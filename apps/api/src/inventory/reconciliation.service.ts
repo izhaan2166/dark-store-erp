@@ -23,6 +23,8 @@ export interface OrderItemMismatch {
   orderItemId: string;
   reservedQty: number;
   openAllocations: number;
+  pickedQty: number;
+  consumedAllocations: number;
 }
 
 export interface ReconciliationReport {
@@ -38,7 +40,8 @@ const NIL_UUID = "00000000-0000-0000-0000-000000000000";
 /**
  * Checks the three duplicated representations against each other:
  * balances vs. the movement ledger, `reserved` vs. open allocations, and
- * order-line `reserved_qty` vs. open allocations. Expected result: no rows.
+ * order-line `reserved_qty` vs. open allocations, and order-line `picked_qty`
+ * vs. consumed allocations. Expected result: no rows.
  */
 @Injectable()
 export class ReconciliationService {
@@ -93,13 +96,16 @@ export class ReconciliationService {
     const orderItems = await executor.execute<Record<string, unknown>>(sql`
       SELECT i.id AS order_item_id,
              i.reserved_qty,
-             COALESCE(SUM(a.quantity - a.consumed_qty - a.released_qty), 0)::int AS open_allocations
+             COALESCE(SUM(a.quantity - a.consumed_qty - a.released_qty), 0)::int AS open_allocations,
+             i.picked_qty,
+             COALESCE(SUM(a.consumed_qty), 0)::int AS consumed_allocations
       FROM order_items i
       JOIN orders o ON o.id = i.order_id
       LEFT JOIN reservation_allocations a ON a.order_item_id = i.id
       WHERE o.store_id = ${storeId}
       GROUP BY i.id
-      HAVING i.reserved_qty <> COALESCE(SUM(a.quantity - a.consumed_qty - a.released_qty), 0)`);
+      HAVING i.reserved_qty <> COALESCE(SUM(a.quantity - a.consumed_qty - a.released_qty), 0)
+          OR i.picked_qty <> COALESCE(SUM(a.consumed_qty), 0)`);
 
     const report: ReconciliationReport = {
       storeId,
@@ -122,6 +128,8 @@ export class ReconciliationService {
         orderItemId: String(r.order_item_id),
         reservedQty: Number(r.reserved_qty),
         openAllocations: Number(r.open_allocations),
+        pickedQty: Number(r.picked_qty),
+        consumedAllocations: Number(r.consumed_allocations),
       })),
     };
     report.ok = report.onHand.length === 0 && report.reserved.length === 0 && report.orderItems.length === 0;
