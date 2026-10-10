@@ -26,7 +26,7 @@ node apps/api/dist/main.js      # GET /health reports API and database status
 node apps/api/dist/worker.js    # background jobs: shortage escalation, expiry sweep
 ```
 
-The phone and tablet app lives in `apps/web` (React + Vite, installable as a PWA). For development run the API, then `pnpm --filter @dse/web dev`; it forwards `/api` calls to `API_URL` (default `http://localhost:3000`). In production serve `apps/web/dist` and the API from one origin, with `/api` routed to the API. It covers sign-in, picking, packing and handover with a keyboard-wedge or Bluetooth scanner, receiving deliveries against a purchase order, putting stock away on shelves, blind shelf counts, and the Store Manager's missing-items list (reserve again, substitute, or send without it) so far; other screens follow.
+The phone and tablet app lives in `apps/web` (React + Vite, installable as a PWA). For development run the API, then `pnpm --filter @dse/web dev`; it forwards `/api` calls to `API_URL` (default `http://localhost:3000`). In production serve `apps/web/dist` and the API from one origin, with `/api` routed to the API. It covers sign-in, picking, packing and handover with a keyboard-wedge or Bluetooth scanner, receiving deliveries against a purchase order, putting stock away on shelves, blind shelf counts, blocking and writing off problem stock, and the Store Manager's approvals and missing-items list (reserve again, substitute, or send without it) so far; other screens follow.
 
 The worker runs every job once a minute (`WORKER_INTERVAL_MS` to change it). Running two workers is safe.
 
@@ -50,7 +50,7 @@ Sign in with `POST /auth/login` (`{ "email", "password" }`) and send the returne
 | `POST /stores/:storeId/locations` · `PATCH …/locations/:locationId` | `locations.manage` |
 | `GET /stores/:storeId/inventory?productId=&locationId=&status=` · `GET …/inventory/products/:productId` | `inventory.view` |
 | `POST /stores/:storeId/stock-counts` (`{ "locationId", "lines": [{ "productId", "batchId", "countedQty" }] }`) | `inventory.count` |
-| `GET /stores/:storeId/stock-counts/:stockCountId` | `inventory.view` |
+| `GET /stores/:storeId/stock-counts?status=pending_approval` (with shelf, counter and differences) and `GET …/stock-counts/:stockCountId` | `inventory.view` |
 | `POST …/stock-counts/:stockCountId/approve` or `/reject` (`{ "reason" }`) | `inventory.approve_count` |
 | `POST /stores/:storeId/quarantines` (`{ "productId", "batchId", "fromLocationId", "toLocationId", "quantity", "reason" }`) | `inventory.adjust` |
 | `POST /stores/:storeId/stock-requests/release` (same body as a quarantine) | `inventory.adjust` |
@@ -70,6 +70,7 @@ Sign in with `POST /auth/login` (`{ "email", "password" }`) and send the returne
 | `POST /stores/:storeId/purchase-orders` | `purchasing.manage` |
 | `GET /stores/:storeId/purchase-orders?status=open` (oldest first, with what is still to come) | `purchasing.view` |
 | `GET /stores/:storeId/purchase-orders/:purchaseOrderId` | `purchasing.view` |
+| `GET /stores/:storeId/goods-receipts?status=pending_approval` (with lines, supplier and receiver) | `purchasing.view` |
 | `POST /stores/:storeId/goods-receipts` | `receiving.record` |
 | `GET /stores/:storeId/goods-receipts/:goodsReceiptId` | `purchasing.view` |
 | `POST /stores/:storeId/goods-receipts/:goodsReceiptId/approve` or `/cancel` (`{ "reason" }`) | `receiving.approve` |

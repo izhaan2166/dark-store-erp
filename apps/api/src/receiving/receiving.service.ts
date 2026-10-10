@@ -6,6 +6,7 @@ import {
   batches,
   goodsReceiptLines,
   goodsReceipts,
+  goodsReceiptStatus,
   locations,
   outboxEvents,
   products,
@@ -70,6 +71,32 @@ export const putawaySchema = z.object({
   quantity: z.number().int().positive().max(1_000_000),
 });
 export type PutawayRequest = z.input<typeof putawaySchema>;
+
+export const listReceiptsSchema = z.object({
+  status: z.enum(goodsReceiptStatus.enumValues).default("pending_approval"),
+});
+
+/** A receipt as a Store Manager reviews it: who, from whom, and each line against what was expected. */
+export type ReceiptSummary = {
+  goodsReceiptId: string;
+  status: string;
+  createdAt: string;
+  poNumber: string | null;
+  supplierName: string;
+  receivedByName: string;
+  lines: {
+    productId: string;
+    sku: string;
+    name: string;
+    lotCode: string | null;
+    expiryDate: string | null;
+    expectedQty: number;
+    acceptedQty: number;
+    damagedQty: number;
+    rejectedQty: number;
+    needsApproval: boolean;
+  }[];
+};
 
 export interface ReceiptView {
   goodsReceiptId: string;
@@ -475,6 +502,32 @@ export class ReceivingService {
         }),
       ),
     );
+  }
+
+  /** Receipts by status, oldest first; by default those waiting for a Store Manager. */
+  async listReceipts(storeId: string, query: unknown): Promise<ReceiptSummary[]> {
+    const { status } = parse(listReceiptsSchema, query, "Invalid filter");
+    const result = await this.handle.db.execute<ReceiptSummary>(sql`
+      SELECT g.id AS "goodsReceiptId", g.status, g.created_at AS "createdAt", po.po_number AS "poNumber",
+             s.name AS "supplierName", u.name AS "receivedByName",
+             json_agg(json_build_object(
+               'productId', gl.product_id, 'sku', p.sku, 'name', p.name,
+               'lotCode', b.lot_code, 'expiryDate', to_char(b.expiry_date, 'YYYY-MM-DD'),
+               'expectedQty', gl.expected_qty, 'acceptedQty', gl.accepted_qty,
+               'damagedQty', gl.damaged_qty, 'rejectedQty', gl.rejected_qty,
+               'needsApproval', gl.needs_approval) ORDER BY gl.line_no) AS lines
+      FROM goods_receipts g
+      JOIN suppliers s ON s.id = g.supplier_id
+      JOIN users u ON u.id = g.received_by
+      LEFT JOIN purchase_orders po ON po.id = g.purchase_order_id
+      JOIN goods_receipt_lines gl ON gl.goods_receipt_id = g.id
+      JOIN products p ON p.id = gl.product_id
+      LEFT JOIN batches b ON b.id = gl.batch_id
+      WHERE g.store_id = ${storeId} AND g.status = ${status}
+      GROUP BY g.id, po.po_number, s.name, u.name
+      ORDER BY g.created_at, g.id
+      LIMIT 200`);
+    return result.rows;
   }
 
   async getReceipt(storeId: string, goodsReceiptId: string): Promise<ReceiptView> {

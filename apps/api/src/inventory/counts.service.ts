@@ -8,6 +8,7 @@ import {
   products,
   stockCountLines,
   stockCounts,
+  stockCountStatus,
   storeSettings,
   type DbExecutor,
   type DbHandle,
@@ -74,6 +75,31 @@ export function countPlan(line: { bookQty: number; blockedQty: number; countedQt
     releasesBlocked: line.blockedQty - removeBlocked,
   };
 }
+
+export const listCountsSchema = z.object({
+  status: z.enum(stockCountStatus.enumValues).default("pending_approval"),
+});
+
+/** A count as a Store Manager reviews it: the shelf, who counted, and each difference with its value. */
+export type CountSummary = {
+  stockCountId: string;
+  status: string;
+  createdAt: string;
+  locationCode: string;
+  countedByName: string;
+  lines: {
+    productId: string;
+    sku: string;
+    name: string;
+    lotCode: string | null;
+    bookQty: number;
+    blockedQty: number;
+    countedQty: number;
+    variance: number;
+    varianceValuePaise: number | null;
+    needsApproval: boolean;
+  }[];
+};
 
 export interface CountView {
   stockCountId: string;
@@ -318,6 +344,31 @@ export class CountsService {
       eventType: "stock_count.posted",
       payload: { stockCountId, locationId, postedBy: actor.actorUserId },
     });
+  }
+
+  /** Counts by status, oldest first; by default those waiting for a Store Manager. */
+  async listCounts(storeId: string, query: unknown): Promise<CountSummary[]> {
+    const { status } = parse(listCountsSchema, query, "Invalid filter");
+    const result = await this.handle.db.execute<CountSummary>(sql`
+      SELECT c.id AS "stockCountId", c.status, c.created_at AS "createdAt", l.code AS "locationCode",
+             u.name AS "countedByName",
+             json_agg(json_build_object(
+               'productId', cl.product_id, 'sku', p.sku, 'name', p.name, 'lotCode', b.lot_code,
+               'bookQty', cl.book_qty, 'blockedQty', cl.blocked_qty, 'countedQty', cl.counted_qty,
+               'variance', cl.counted_qty - cl.book_qty,
+               'varianceValuePaise', (cl.counted_qty - cl.book_qty) * cl.unit_cost_paise,
+               'needsApproval', cl.needs_approval) ORDER BY p.name, b.expiry_date) AS lines
+      FROM stock_counts c
+      JOIN locations l ON l.id = c.location_id
+      JOIN users u ON u.id = c.counted_by
+      JOIN stock_count_lines cl ON cl.stock_count_id = c.id
+      JOIN products p ON p.id = cl.product_id
+      LEFT JOIN batches b ON b.id = cl.batch_id
+      WHERE c.store_id = ${storeId} AND c.status = ${status}
+      GROUP BY c.id, l.code, u.name
+      ORDER BY c.created_at, c.id
+      LIMIT 200`);
+    return result.rows;
   }
 
   async getCount(storeId: string, stockCountId: string): Promise<CountView> {

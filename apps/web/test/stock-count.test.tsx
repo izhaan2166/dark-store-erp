@@ -15,6 +15,7 @@ const row = (over: Partial<StockRow> = {}): StockRow => ({
   expiryDate: null,
   status: "available",
   onHand: 5,
+  free: 5,
   ...over,
 });
 

@@ -1,6 +1,18 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, sql } from "drizzle-orm";
-import { auditLogs, batches, locations, outboxEvents, stockRequests, storeSettings, type DbExecutor, type DbHandle } from "@dse/db";
+import { and, desc, eq, getTableColumns, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+import {
+  auditLogs,
+  batches,
+  locations,
+  outboxEvents,
+  products,
+  stockRequests,
+  storeSettings,
+  users,
+  type DbExecutor,
+  type DbHandle,
+} from "@dse/db";
 import { z } from "zod";
 import type { Actor } from "../common/actor";
 import { InsufficientStockError, InvalidStateTransitionError, NotFoundError, ValidationError } from "../common/errors";
@@ -50,6 +62,17 @@ export type WriteOffRequest = z.input<typeof writeOffSchema>;
 export const decisionSchema = z.object({ reason });
 
 export type StockRequestView = typeof stockRequests.$inferSelect;
+
+/** A request with the names a Store Manager needs to decide it. */
+export type StockRequestSummary = StockRequestView & {
+  sku: string;
+  productName: string;
+  lotCode: string | null;
+  expiryDate: string | null;
+  fromLocationCode: string;
+  toLocationCode: string | null;
+  requestedByName: string;
+};
 
 /**
  * Quarantine, quarantine release and write-off.
@@ -204,15 +227,31 @@ export class StockControlService {
   }
 
   /** The approval queue, newest first. */
-  async listRequests(storeId: string, query: unknown): Promise<StockRequestView[]> {
+  async listRequests(storeId: string, query: unknown): Promise<StockRequestSummary[]> {
     const { status } = parse(
       z.object({ status: z.enum(["pending_approval", "approved", "rejected"]).default("pending_approval") }),
       query,
       "Invalid filter",
     );
+    const from = alias(locations, "from_location");
+    const to = alias(locations, "to_location");
     return this.handle.db
-      .select()
+      .select({
+        ...getTableColumns(stockRequests),
+        sku: products.sku,
+        productName: products.name,
+        lotCode: batches.lotCode,
+        expiryDate: batches.expiryDate,
+        fromLocationCode: from.code,
+        toLocationCode: to.code,
+        requestedByName: users.name,
+      })
       .from(stockRequests)
+      .innerJoin(products, eq(products.id, stockRequests.productId))
+      .leftJoin(batches, eq(batches.id, stockRequests.batchId))
+      .innerJoin(from, eq(from.id, stockRequests.fromLocationId))
+      .leftJoin(to, eq(to.id, stockRequests.toLocationId))
+      .innerJoin(users, eq(users.id, stockRequests.requestedBy))
       .where(and(eq(stockRequests.storeId, storeId), eq(stockRequests.status, status)))
       .orderBy(desc(stockRequests.createdAt))
       .limit(200);
