@@ -60,7 +60,7 @@ Sign in with `POST /auth/login` (`{ "email", "password" }`) and send the returne
 | `GET /stores/:storeId/orders/:orderId/fulfilment` (pick list, progress, open shortages) | `orders.view` |
 | `POST …/orders/:orderId/start-picking` · `/picks` · `/short-picks` · `/complete-picking` | `orders.pick` |
 | `GET /stores/:storeId/shortages` (open shortages across the store, escalated first) | `orders.view` |
-| `POST …/orders/:orderId/shortages/:shortageId/resolve` (`{ "resolution": "reallocate" \| "remove", "reason" }`) | `orders.resolve_shortage` |
+| `POST …/orders/:orderId/shortages/:shortageId/resolve` (`{ "resolution": "reallocate" \| "remove", "reason" }`, or `{ "resolution": "substitute", "substituteProductId", "quantity", "reason" }`) | `orders.resolve_shortage` |
 | `POST …/orders/:orderId/pack` · `/handover` | `orders.pack` |
 | `POST /stores/:storeId/suppliers` | `purchasing.manage` |
 | `POST /stores/:storeId/purchase-orders` | `purchasing.manage` |

@@ -37,7 +37,8 @@ Frozen on 10 Oct 2026. Change them only when implementation or testing shows a r
 - Pickers work from the reserved bins and batches, earliest expiry first within each bin. A pick must scan a barcode of the line's product and cannot exceed what is reserved for the line in that bin.
 - A pick moves units from the bin to the order's packing location (fixed at the first pick) and consumes the allocation. Units stay `available` there, but packing locations are never allocatable, so no other order can take them.
 - A short pick releases the allocation, opens a `short_pick` shortage and moves the missing units to `quarantined` in the same bin with the picker's reason. They stay out of available stock until a count settles the difference; stock is never silently written off.
-- Only a Store Manager resolves shortages. Substitution records are not built yet; until then a shortage is reallocated or removed.
+- Only a Store Manager resolves shortages: reallocate it, remove it (the order goes out short) or substitute it.
+- A substitution adds a new order line for another active product, in any quantity the manager chooses, linked to the shortage it replaces (`order_items.substitutes_shortage_id`). The new line must be reserved in full or the substitution is refused. It is then picked, packed and handed over like any other line. There is no price change or customer consent step in the system yet.
 - Every fulfilment step locks the order row first, then balance rows in primary-key order, creating missing destination rows before locking.
 - Reconciliation also checks each line's `picked_qty` against its consumed allocations.
 

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigint,
   bigserial,
   boolean,
@@ -373,9 +374,12 @@ export const orderItems = pgTable(
     reservedQty: integer("reserved_qty").notNull().default(0),
     pickedQty: integer("picked_qty").notNull().default(0),
     fulfilledQty: integer("fulfilled_qty").notNull().default(0),
+    /** Set on a line a Store Manager added to replace a shortage with another product. */
+    substitutesShortageId: uuid("substitutes_shortage_id").references((): AnyPgColumn => orderItemShortages.id),
   },
   (t) => [
     unique("order_items_order_line").on(t.orderId, t.lineNo),
+    unique("order_items_substitutes_shortage").on(t.substitutesShortageId),
     check("order_items_requested_positive", sql`${t.requestedQty} > 0`),
     check(
       "order_items_quantities_ordered",

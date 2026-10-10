@@ -37,7 +37,8 @@ Rules on top of the table:
 - `open → resolved` only, with resolution, approver and time recorded (enforced by a check constraint).
 - Sources: `reservation` (not enough sellable stock when the order was accepted), `short_pick` (the picker could not find reserved units) and `expired` (the expiry sweep released reserved units of an expired batch).
 - A shortage still open after the store's escalation time gets `escalated_at` set once by the worker. Escalation never changes the order's status.
-- Resolutions: `reallocated` (the units were reserved again from other eligible stock; refused if there is not enough), `removed` (the order goes out short; requested quantity is kept for history), `order_cancelled`.
+- Resolutions: `reallocated` (the units were reserved again from other eligible stock; refused if there is not enough), `removed` (the order goes out short; requested quantity is kept for history), `substituted` (a new line for another product was added and fully reserved; refused if there is not enough), `order_cancelled`.
+- Reallocating or substituting on an order in `packing` sends it back to `picking`.
 
 ## Purchase orders
 

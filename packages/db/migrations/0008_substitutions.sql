@@ -1,0 +1,3 @@
+ALTER TABLE "order_items" ADD COLUMN "substitutes_shortage_id" uuid;--> statement-breakpoint
+ALTER TABLE "order_items" ADD CONSTRAINT "order_items_substitutes_shortage_id_order_item_shortages_id_fk" FOREIGN KEY ("substitutes_shortage_id") REFERENCES "public"."order_item_shortages"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "order_items" ADD CONSTRAINT "order_items_substitutes_shortage" UNIQUE("substitutes_shortage_id");

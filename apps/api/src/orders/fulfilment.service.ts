@@ -20,6 +20,7 @@ import {
   InsufficientStockError,
   InvalidStateTransitionError,
   NotFoundError,
+  ProductUnavailableError,
   ValidationError,
   WrongItemError,
 } from "../common/errors";
@@ -49,11 +50,23 @@ export const shortPickSchema = z.object({
 });
 export type ShortPickRequest = z.input<typeof shortPickSchema>;
 
-export const resolveShortageSchema = z.object({
-  /** `reallocate` reserves the units again from other stock; `remove` accepts the order going out short. */
-  resolution: z.enum(["reallocate", "remove"]),
-  reason: z.string().trim().min(1).max(500),
-});
+const resolutionReason = z.string().trim().min(1).max(500);
+
+/**
+ * `reallocate` reserves the units again from other stock; `remove` accepts
+ * the order going out short; `substitute` adds a line for another product,
+ * reserved in full, in place of the missing units.
+ */
+export const resolveShortageSchema = z.discriminatedUnion("resolution", [
+  z.object({ resolution: z.literal("reallocate"), reason: resolutionReason }),
+  z.object({ resolution: z.literal("remove"), reason: resolutionReason }),
+  z.object({
+    resolution: z.literal("substitute"),
+    reason: resolutionReason,
+    substituteProductId: z.string().uuid(),
+    quantity: z.number().int().positive().max(10_000),
+  }),
+]);
 export type ResolveShortageRequest = z.input<typeof resolveShortageSchema>;
 
 export const packSchema = z.object({
@@ -85,6 +98,8 @@ export interface FulfilmentLine {
   pickedQty: number;
   fulfilledQty: number;
   openShortageQty: number;
+  /** The line this one replaces, when a Store Manager substituted another product. */
+  substitutesItemId: string | null;
   /** Where to pick the reserved units, earliest expiry first within each bin. */
   tasks: PickTask[];
 }
@@ -321,21 +336,39 @@ export class FulfilmentService {
             available: shortage.quantity - remaining,
           });
         }
-        if (order.status === "packing") {
-          await transitionOrder(tx, actor.storeId, orderId, "picking", { expectedFrom: ["packing"] });
-        }
+      }
+
+      let substituteItemId: string | undefined;
+      if (body.resolution === "substitute") {
+        substituteItemId = await this.addSubstitute(tx, actor.storeId, orderId, shortage, body);
+      }
+
+      if (body.resolution !== "remove" && order.status === "packing") {
+        await transitionOrder(tx, actor.storeId, orderId, "picking", { expectedFrom: ["packing"] });
       }
 
       await tx
         .update(orderItemShortages)
         .set({
           status: "resolved",
-          resolution: body.resolution === "reallocate" ? "reallocated" : "removed",
+          resolution: RESOLUTIONS[body.resolution],
           resolvedBy: actor.actorUserId,
           resolvedAt: new Date(),
         })
         .where(and(eq(orderItemShortages.id, shortageId), eq(orderItemShortages.status, "open")));
-      await this.audit(tx, actor, "order.resolve_shortage", orderId, { shortageId, ...body, quantity: shortage.quantity });
+      await this.audit(tx, actor, "order.resolve_shortage", orderId, {
+        shortageId,
+        ...body,
+        shortQuantity: shortage.quantity,
+        substituteItemId,
+      });
+      if (substituteItemId) {
+        await tx.insert(outboxEvents).values({
+          storeId: actor.storeId,
+          eventType: "order.item_substituted",
+          payload: { orderId, shortageId, orderItemId: substituteItemId },
+        });
+      }
     });
     return this.view(actor.storeId, orderId);
   }
@@ -463,7 +496,8 @@ export class FulfilmentService {
              i.requested_qty AS "requestedQty", i.reserved_qty AS "reservedQty", i.picked_qty AS "pickedQty",
              i.fulfilled_qty AS "fulfilledQty",
              coalesce((SELECT sum(s.quantity) FROM order_item_shortages s
-                       WHERE s.order_item_id = i.id AND s.status = 'open'), 0)::int AS "openShortageQty"
+                       WHERE s.order_item_id = i.id AND s.status = 'open'), 0)::int AS "openShortageQty",
+             (SELECT s.order_item_id FROM order_item_shortages s WHERE s.id = i.substitutes_shortage_id) AS "substitutesItemId"
       FROM order_items i JOIN products p ON p.id = i.product_id
       WHERE i.order_id = ${orderId}
       ORDER BY i.line_no`);
@@ -501,6 +535,62 @@ export class FulfilmentService {
       })),
       openShortages: shortages,
     };
+  }
+
+  /**
+   * Adds a line for the substitute product and reserves all of it, or
+   * refuses. The order row is already locked; balance rows are locked next.
+   */
+  private async addSubstitute(
+    tx: DbExecutor,
+    storeId: string,
+    orderId: string,
+    shortage: { id: string; productId: string },
+    body: { substituteProductId: string; quantity: number },
+  ): Promise<string> {
+    if (body.substituteProductId === shortage.productId) {
+      throw new ValidationError("Pick a different product, or reallocate the shortage instead");
+    }
+    const [product] = await tx
+      .select({ status: products.status })
+      .from(products)
+      .where(eq(products.id, body.substituteProductId));
+    if (!product || product.status !== "active") {
+      throw new ProductUnavailableError("The substitute product is unknown or inactive", {
+        productIds: [body.substituteProductId],
+      });
+    }
+    const [{ next }] = (
+      await tx.execute<{ next: number }>(sql`
+        SELECT coalesce(max(line_no), 0)::int + 1 AS next FROM order_items WHERE order_id = ${orderId}`)
+    ).rows as [{ next: number }];
+    const [item] = await tx
+      .insert(orderItems)
+      .values({
+        orderId,
+        lineNo: next,
+        productId: body.substituteProductId,
+        requestedQty: body.quantity,
+        substitutesShortageId: shortage.id,
+      })
+      .returning({ id: orderItems.id });
+    const [reservation] = await tx
+      .select({ id: stockReservations.id })
+      .from(stockReservations)
+      .where(eq(stockReservations.orderId, orderId));
+    const eligible = await lockEligibleBalances(tx, storeId, [body.substituteProductId]);
+    const { remaining } = await allocateLine(
+      tx,
+      { reservationId: reservation!.id, orderItemId: item!.id, productId: body.substituteProductId, quantity: body.quantity },
+      eligible,
+    );
+    if (remaining > 0) {
+      throw new InsufficientStockError("Not enough sellable stock of the substitute", {
+        needed: body.quantity,
+        available: body.quantity - remaining,
+      });
+    }
+    return item!.id;
   }
 
   /** The Store Manager's queue: every open shortage in the store, escalated ones first, oldest first. */
@@ -638,6 +728,8 @@ export class FulfilmentService {
     });
   }
 }
+
+const RESOLUTIONS = { reallocate: "reallocated", remove: "removed", substitute: "substituted" } as const;
 
 function requireStatus(status: OrderStatus, allowed: OrderStatus[], message: string): void {
   if (!allowed.includes(status)) throw new InvalidStateTransitionError(message, { status, allowed });

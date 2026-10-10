@@ -82,6 +82,7 @@ export interface OrderView {
     pickedQty: number;
     fulfilledQty: number;
     openShortageQty: number;
+    substitutesItemId: string | null;
   }[];
 }
 
@@ -254,6 +255,8 @@ export class OrdersService {
         openShortageQty: sql<number>`coalesce((
           SELECT sum(s.quantity) FROM order_item_shortages s
           WHERE s.order_item_id = ${orderItems.id} AND s.status = 'open'), 0)::int`,
+        substitutesItemId: sql<string | null>`(
+          SELECT s.order_item_id FROM order_item_shortages s WHERE s.id = ${orderItems.substitutesShortageId})`,
       })
       .from(orderItems)
       .where(eq(orderItems.orderId, orderId))
