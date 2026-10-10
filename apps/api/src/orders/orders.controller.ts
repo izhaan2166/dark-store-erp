@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, Inject, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Headers, HttpCode, Inject, Param, Post, Query } from "@nestjs/common";
 import { z } from "zod";
 import type { AuthUser } from "../auth/auth.service";
 import { CurrentUser, RequirePermission } from "../auth/decorators";
@@ -23,6 +23,12 @@ export class OrdersController {
     @Body() body: AcceptOrderRequest,
   ) {
     return this.orders.acceptOrder({ storeId, actorUserId: user.userId, idempotencyKey: idempotencyKey(key) }, body);
+  }
+
+  @Get()
+  @RequirePermission("orders.view")
+  list(@Param("storeId") storeId: string, @Query() query: Record<string, unknown>) {
+    return this.orders.listOrders(storeId, query);
   }
 
   @Get(":orderId")

@@ -9,7 +9,8 @@ The build plan and every agreed decision live in [docs/decisions.md](docs/decisi
 | Path | What it is |
 | --- | --- |
 | `packages/db` | Drizzle schema, SQL migrations and the migration runner |
-| `apps/api` | NestJS API: sign-in and roles, products and locations, inventory ledger, receiving, reservations, orders |
+| `apps/api` | NestJS API and background worker: sign-in and roles, products and locations, inventory ledger, receiving, reservations, orders |
+| `apps/web` | Phone and tablet app (React PWA) |
 | `docs` | Decisions, state machines and other design notes |
 
 ## Getting started
@@ -25,6 +26,8 @@ node apps/api/dist/main.js      # GET /health reports API and database status
 node apps/api/dist/worker.js    # background jobs: shortage escalation, expiry sweep
 ```
 
+The phone and tablet app lives in `apps/web` (React + Vite, installable as a PWA). For development run the API, then `pnpm --filter @dse/web dev`; it forwards `/api` calls to `API_URL` (default `http://localhost:3000`). In production serve `apps/web/dist` and the API from one origin, with `/api` routed to the API. It covers sign-in and picking with a keyboard-wedge or Bluetooth scanner so far; other screens follow.
+
 The worker runs every job once a minute (`WORKER_INTERVAL_MS` to change it). Running two workers is safe.
 
 Create the first user (and the store, if it does not exist yet):
@@ -37,7 +40,7 @@ CREATE_USER_PASSWORD='choose-a-long-password' pnpm --filter @dse/api create-user
 
 ## API
 
-Sign in with `POST /auth/login` (`{ "email", "password" }`) and send the returned token as `Authorization: Bearer <token>`. Sessions last 12 hours; `POST /auth/logout` ends one early and `GET /auth/me` lists your roles per store.
+Sign in with `POST /auth/login` (`{ "email", "password" }`) and send the returned token as `Authorization: Bearer <token>`. The response lists each store you work in with its name, your roles and your permissions. Sessions last 12 hours; `POST /auth/logout` ends one early and `GET /auth/me` lists your roles per store.
 
 | Endpoint | Permission |
 | --- | --- |
@@ -55,6 +58,7 @@ Sign in with `POST /auth/login` (`{ "email", "password" }`) and send the returne
 | `GET /stores/:storeId/stock-requests?status=pending_approval` and `GET …/stock-requests/:requestId` | `inventory.view` |
 | `POST …/stock-requests/:requestId/approve` or `/reject` (`{ "reason" }`) | `inventory.approve_request` |
 | `POST /stores/:storeId/orders` | `orders.create` |
+| `GET /stores/:storeId/orders?status=accepted,picking` (oldest first, with progress) | `orders.view` |
 | `GET /stores/:storeId/orders/:orderId` | `orders.view` |
 | `POST /stores/:storeId/orders/:orderId/cancel` (`{ "reason" }`) | `orders.cancel` |
 | `GET /stores/:storeId/orders/:orderId/fulfilment` (pick list, progress, open shortages) | `orders.view` |

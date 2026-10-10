@@ -50,7 +50,16 @@ describe("login and sessions", () => {
     const res = await server.request("POST", "/auth/login", { body: { email: email.toUpperCase(), password: PASSWORD } });
     expect(res.status).toBe(200);
     expect(res.body.user.id).toBe(userId);
-    expect(res.body.stores).toEqual([{ storeId: store.storeId, roles: expect.arrayContaining(["picker", "packer"]) }]);
+    expect(res.body.stores).toEqual([
+      {
+        storeId: store.storeId,
+        code: expect.any(String),
+        name: "Test store",
+        roles: expect.arrayContaining(["picker", "packer"]),
+        permissions: expect.arrayContaining(["orders.pick", "orders.pack"]),
+      },
+    ]);
+    expect(res.body.stores[0].permissions).not.toContain("orders.resolve_shortage");
     expect(typeof res.body.token).toBe("string");
 
     // Only a hash of the token is stored.

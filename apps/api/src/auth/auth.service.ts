@@ -1,12 +1,12 @@
 import { createHash, randomBytes } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, gt, isNull } from "drizzle-orm";
-import { authSessions, userStoreRoles, users, type DbHandle } from "@dse/db";
+import { and, eq, gt, inArray, isNull } from "drizzle-orm";
+import { authSessions, stores, userStoreRoles, users, type DbHandle } from "@dse/db";
 import { z } from "zod";
 import { InvalidCredentialsError, UnauthenticatedError, ValidationError } from "../common/errors";
 import { DB_HANDLE } from "../database/database.tokens";
 import { hashPassword, verifyPassword } from "./passwords";
-import type { Role } from "./permissions";
+import { PERMISSIONS, type Permission, type Role, rolesGrant } from "./permissions";
 
 /** A session lasts one long shift; staff sign in again after it. */
 export const SESSION_HOURS = 12;
@@ -26,11 +26,20 @@ export interface AuthUser {
   tokenHash: string;
 }
 
+/** A store the user works in, with what they may do there, so screens can hide the rest. */
+export interface StoreAccess {
+  storeId: string;
+  code: string;
+  name: string;
+  roles: Role[];
+  permissions: Permission[];
+}
+
 export interface LoginResult {
   token: string;
   expiresAt: string;
   user: { id: string; email: string; name: string };
-  stores: { storeId: string; roles: Role[] }[];
+  stores: StoreAccess[];
 }
 
 // Compared against when the email is unknown, so both paths take the same time.
@@ -63,8 +72,28 @@ export class AuthService {
       token,
       expiresAt: expiresAt.toISOString(),
       user: { id: user.id, email: user.email, name: user.name },
-      stores: [...roles].map(([storeId, r]) => ({ storeId, roles: r })),
+      stores: await this.storeAccess(roles),
     };
+  }
+
+  async storeAccess(storeRoles: Map<string, Role[]>): Promise<StoreAccess[]> {
+    const ids = [...storeRoles.keys()];
+    if (ids.length === 0) return [];
+    const rows = await this.handle.db
+      .select({ id: stores.id, code: stores.code, name: stores.name })
+      .from(stores)
+      .where(inArray(stores.id, ids))
+      .orderBy(stores.code);
+    return rows.map((store) => {
+      const roles = storeRoles.get(store.id)!;
+      return {
+        storeId: store.id,
+        code: store.code,
+        name: store.name,
+        roles,
+        permissions: PERMISSIONS.filter((p) => rolesGrant(roles, p)),
+      };
+    });
   }
 
   /** Resolves a bearer token to its user and current roles, or throws. */

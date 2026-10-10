@@ -20,10 +20,10 @@ export class AuthController {
   }
 
   @Get("me")
-  me(@CurrentUser() user: AuthUser) {
+  async me(@CurrentUser() user: AuthUser) {
     return {
       user: { id: user.userId, email: user.email, name: user.name },
-      stores: [...user.storeRoles].map(([storeId, roles]) => ({ storeId, roles })),
+      stores: await this.auth.storeAccess(user.storeRoles),
     };
   }
 }
