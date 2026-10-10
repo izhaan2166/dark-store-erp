@@ -61,6 +61,13 @@ Frozen on 10 Oct 2026. Change them only when implementation or testing shows a r
 - Damaged units are recorded as received into the store's quarantine location with status `damaged`, so they are tracked but never sold. Rejected units never enter stock. Both always create a discrepancy record.
 - Lock order for receiving: purchase order row, then goods receipt row, then location rows (shared), then product rows by id, then balance rows by id.
 
+## Stock counts
+
+- A count covers one storage location. The book quantity per product and batch is everything there that is `available` or blocked as `quarantined`; it is recorded with the count, and posting applies that recorded difference as `adjustment` movements.
+- Missing units come out of blocked stock first. Blocked units the counter finds after all go back to `available` with a `status_change` movement, which is a quarantine release and so always needs Store Manager approval.
+- Within the count-variance thresholds below the count posts at once; otherwise it waits for a Store Manager to approve or reject it with a reason. The unit cost used is the product's moving average when the count is submitted.
+- A count never removes units that orders have reserved. If the shelf holds fewer than are reserved, the count is refused and the picker reports a short pick first.
+
 ## Approval thresholds
 
 Editable defaults in `store_settings`:

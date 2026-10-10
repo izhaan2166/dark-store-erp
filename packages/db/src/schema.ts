@@ -86,6 +86,8 @@ export const purchaseOrderStatus = pgEnum("purchase_order_status", ["open", "rec
 
 export const goodsReceiptStatus = pgEnum("goods_receipt_status", ["pending_approval", "posted", "cancelled"]);
 
+export const stockCountStatus = pgEnum("stock_count_status", ["pending_approval", "posted", "rejected"]);
+
 export const receivingDiscrepancyKind = pgEnum("receiving_discrepancy_kind", [
   "short",
   "excess",
@@ -643,4 +645,68 @@ export const receivingDiscrepancies = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check("receiving_discrepancies_quantity_positive", sql`${t.quantity} > 0`)],
+);
+
+// ---------------------------------------------------------------------------
+// Stock counts
+// ---------------------------------------------------------------------------
+
+/** A physical count of one location. Stock changes only when it is posted. */
+export const stockCounts = pgTable(
+  "stock_counts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id),
+    locationId: uuid("location_id")
+      .notNull()
+      .references(() => locations.id),
+    status: stockCountStatus("status").notNull(),
+    countedBy: uuid("counted_by")
+      .notNull()
+      .references(() => users.id),
+    decidedBy: uuid("decided_by").references(() => users.id),
+    decisionReason: text("decision_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("stock_counts_store_status_idx").on(t.storeId, t.status),
+    check(
+      "stock_counts_decision_recorded",
+      sql`${t.status} = 'pending_approval'
+        OR ${t.status} = 'posted' AND ${t.decidedBy} IS NULL
+        OR ${t.decidedBy} IS NOT NULL AND ${t.decisionReason} IS NOT NULL`,
+    ),
+  ],
+);
+
+export const stockCountLines = pgTable(
+  "stock_count_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    stockCountId: uuid("stock_count_id")
+      .notNull()
+      .references(() => stockCounts.id),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    batchId: uuid("batch_id").references(() => batches.id),
+    /** Book units in the location (available plus blocked) when the count was submitted. */
+    bookQty: integer("book_qty").notNull(),
+    /** Of the book units, how many were blocked as `quarantined` (e.g. after a short pick). */
+    blockedQty: integer("blocked_qty").notNull(),
+    countedQty: integer("counted_qty").notNull(),
+    /** Moving average cost when the count was submitted; null if the product has none yet. */
+    unitCostPaise: integer("unit_cost_paise"),
+    needsApproval: boolean("needs_approval").notNull(),
+  },
+  (t) => [
+    unique("stock_count_lines_item").on(t.stockCountId, t.productId, t.batchId).nullsNotDistinct(),
+    check(
+      "stock_count_lines_quantities",
+      sql`${t.bookQty} >= 0 AND ${t.blockedQty} >= 0 AND ${t.blockedQty} <= ${t.bookQty} AND ${t.countedQty} >= 0`,
+    ),
+  ],
 );
