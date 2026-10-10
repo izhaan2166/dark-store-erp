@@ -1,6 +1,15 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, inArray } from "drizzle-orm";
-import { auditLogs, products, purchaseOrderLines, purchaseOrders, suppliers, type DbHandle } from "@dse/db";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import {
+  auditLogs,
+  goodsReceipts,
+  products,
+  purchaseOrderLines,
+  purchaseOrders,
+  purchaseOrderStatus,
+  suppliers,
+  type DbHandle,
+} from "@dse/db";
 import { z } from "zod";
 import type { Actor } from "../common/actor";
 import { ConflictError, NotFoundError, ProductUnavailableError, ValidationError } from "../common/errors";
@@ -31,15 +40,42 @@ export const createPurchaseOrderSchema = z.object({
 });
 export type CreatePurchaseOrderRequest = z.infer<typeof createPurchaseOrderSchema>;
 
+export const listPurchaseOrdersSchema = z.object({
+  /** Comma-separated statuses; defaults to orders still expected. */
+  status: z
+    .string()
+    .default("open")
+    .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean))
+    .pipe(z.array(z.enum(purchaseOrderStatus.enumValues)).min(1)),
+});
+
+export type PurchaseOrderSummary = {
+  purchaseOrderId: string;
+  poNumber: string;
+  supplierName: string;
+  status: string;
+  createdAt: string;
+  lineCount: number;
+  orderedUnits: number;
+  outstandingUnits: number;
+  /** Receipts against this order waiting for a Store Manager; their units are not counted as received yet. */
+  pendingReceipts: number;
+};
+
 export interface PurchaseOrderView {
   purchaseOrderId: string;
   poNumber: string;
   supplierId: string;
+  supplierName: string;
   status: string;
+  pendingReceipts: number;
   lines: {
     purchaseOrderLineId: string;
     lineNo: number;
     productId: string;
+    sku: string;
+    name: string;
+    batchTracked: boolean;
     orderedQty: number;
     receivedQty: number;
     outstandingQty: number;
@@ -139,27 +175,79 @@ export class PurchasingService {
     }
   }
 
+  /** Purchase orders for the receiving screen, oldest first. */
+  async listPurchaseOrders(storeId: string, query: unknown): Promise<PurchaseOrderSummary[]> {
+    const { status } = parse(listPurchaseOrdersSchema, query, "Invalid filter");
+    const result = await this.handle.db.execute<PurchaseOrderSummary>(sql`
+      SELECT po.id AS "purchaseOrderId", po.po_number AS "poNumber", s.name AS "supplierName", po.status,
+             po.created_at AS "createdAt",
+             count(l.id)::int AS "lineCount",
+             coalesce(sum(l.ordered_qty), 0)::int AS "orderedUnits",
+             coalesce(sum(greatest(l.ordered_qty - l.received_qty, 0)), 0)::int AS "outstandingUnits",
+             (SELECT count(*)::int FROM goods_receipts g
+              WHERE g.purchase_order_id = po.id AND g.status = 'pending_approval') AS "pendingReceipts"
+      FROM purchase_orders po
+      JOIN suppliers s ON s.id = po.supplier_id
+      LEFT JOIN purchase_order_lines l ON l.purchase_order_id = po.id
+      WHERE po.store_id = ${storeId}
+        AND po.status IN (${sql.join(
+          status.map((st) => sql`${st}`),
+          sql`, `,
+        )})
+      GROUP BY po.id, s.name
+      ORDER BY po.created_at, po.id
+      LIMIT 200`);
+    return result.rows;
+  }
+
   async getPurchaseOrder(storeId: string, purchaseOrderId: string): Promise<PurchaseOrderView> {
     const { db } = this.handle;
     const [po] = await db
-      .select()
+      .select({
+        id: purchaseOrders.id,
+        poNumber: purchaseOrders.poNumber,
+        supplierId: purchaseOrders.supplierId,
+        supplierName: suppliers.name,
+        status: purchaseOrders.status,
+      })
       .from(purchaseOrders)
+      .innerJoin(suppliers, eq(suppliers.id, purchaseOrders.supplierId))
       .where(and(eq(purchaseOrders.id, purchaseOrderId), eq(purchaseOrders.storeId, storeId)));
     if (!po) throw new NotFoundError("Purchase order not found", { purchaseOrderId });
     const lines = await db
-      .select()
+      .select({
+        id: purchaseOrderLines.id,
+        lineNo: purchaseOrderLines.lineNo,
+        productId: purchaseOrderLines.productId,
+        sku: products.sku,
+        name: products.name,
+        batchTracked: products.batchTracked,
+        orderedQty: purchaseOrderLines.orderedQty,
+        receivedQty: purchaseOrderLines.receivedQty,
+        unitCostPaise: purchaseOrderLines.unitCostPaise,
+      })
       .from(purchaseOrderLines)
+      .innerJoin(products, eq(products.id, purchaseOrderLines.productId))
       .where(eq(purchaseOrderLines.purchaseOrderId, po.id))
       .orderBy(purchaseOrderLines.lineNo);
+    const [pending] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(goodsReceipts)
+      .where(and(eq(goodsReceipts.purchaseOrderId, po.id), eq(goodsReceipts.status, "pending_approval")));
     return {
       purchaseOrderId: po.id,
       poNumber: po.poNumber,
       supplierId: po.supplierId,
+      supplierName: po.supplierName,
       status: po.status,
+      pendingReceipts: pending!.count,
       lines: lines.map((l) => ({
         purchaseOrderLineId: l.id,
         lineNo: l.lineNo,
         productId: l.productId,
+        sku: l.sku,
+        name: l.name,
+        batchTracked: l.batchTracked,
         orderedQty: l.orderedQty,
         receivedQty: l.receivedQty,
         outstandingQty: Math.max(0, l.orderedQty - l.receivedQty),

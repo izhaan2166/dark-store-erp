@@ -1,9 +1,12 @@
 import { useMemo, useState } from "react";
 import { Api, type Session } from "./api";
-import { useRoute } from "./route";
+import { permissionFor, useRoute } from "./route";
 import { OrderQueue } from "./screens/OrderQueue";
 import { PackOrder } from "./screens/PackOrder";
 import { PickOrder } from "./screens/PickOrder";
+import { Putaway } from "./screens/Putaway";
+import { ReceiveList } from "./screens/ReceiveList";
+import { ReceiveOrder } from "./screens/ReceiveOrder";
 import { Shortages } from "./screens/Shortages";
 import { SignIn } from "./screens/SignIn";
 import { Stores } from "./screens/Stores";
@@ -31,8 +34,7 @@ export function App() {
   }
 
   const store = "storeId" in route ? session.stores.find((s) => s.storeId === route.storeId) : undefined;
-  const needs =
-    route.screen === "shortages" ? "orders.resolve_shortage" : "job" in route ? (route.job === "pick" ? "orders.pick" : "orders.pack") : null;
+  const needs = permissionFor(route);
   const allowed = needs !== null && (store?.permissions.includes(needs) ?? false);
 
   return (
@@ -48,6 +50,12 @@ export function App() {
         <Stores session={session} />
       ) : route.screen === "shortages" ? (
         <Shortages api={api} storeId={route.storeId} />
+      ) : route.screen === "receive" ? (
+        <ReceiveList api={api} storeId={route.storeId} />
+      ) : route.screen === "receipt" ? (
+        <ReceiveOrder key={route.purchaseOrderId} api={api} storeId={route.storeId} purchaseOrderId={route.purchaseOrderId} />
+      ) : route.screen === "putaway" ? (
+        <Putaway api={api} storeId={route.storeId} />
       ) : route.screen === "queue" ? (
         <OrderQueue key={route.job} api={api} storeId={route.storeId} job={route.job} />
       ) : route.job === "pick" ? (
