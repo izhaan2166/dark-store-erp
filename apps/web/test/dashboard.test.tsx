@@ -54,6 +54,7 @@ describe("what needs attention", () => {
       ["12 units in the unloading area to put away", false],
     ]);
     expect(items[0]!.route).toEqual({ screen: "shortages", storeId: "s1" });
+    expect(items[1]).toMatchObject({ route: { screen: "orders", storeId: "s1" }, permission: "orders.create" });
   });
 });
 

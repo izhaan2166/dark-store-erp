@@ -47,7 +47,7 @@ export function attentionItems(view: View, storeId: string): Attention[] {
     });
   }
   if (e.problemOrders > 0) {
-    items.push({ text: `${plural(e.problemOrders, "order")} stuck with a problem`, urgent: true, route: null, permission: "orders.view" });
+    items.push({ text: `${plural(e.problemOrders, "order")} stuck with a problem`, urgent: true, route: { screen: "orders", storeId }, permission: "orders.create" });
   }
   return items.sort((a, b) => Number(b.urgent) - Number(a.urgent));
 }
