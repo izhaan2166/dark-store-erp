@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, Inject, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Headers, HttpCode, Inject, Param, Post, Query } from "@nestjs/common";
 import type { AuthUser } from "../auth/auth.service";
 import { CurrentUser, RequirePermission } from "../auth/decorators";
 import { idParam, requireIdempotencyKey } from "../common/http";
@@ -23,6 +23,12 @@ export class CountsController {
     @Body() body: SubmitCountRequest,
   ) {
     return this.counts.submitCount(actorFor(user, storeId, key), body);
+  }
+
+  @Get()
+  @RequirePermission("inventory.view")
+  list(@Param("storeId") storeId: string, @Query() query: Record<string, string>) {
+    return this.counts.listCounts(storeId, query);
   }
 
   @Get(":stockCountId")

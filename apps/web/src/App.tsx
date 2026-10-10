@@ -9,7 +9,9 @@ import { ReceiveList } from "./screens/ReceiveList";
 import { ReceiveOrder } from "./screens/ReceiveOrder";
 import { Shortages } from "./screens/Shortages";
 import { SignIn } from "./screens/SignIn";
+import { Approvals } from "./screens/Approvals";
 import { CountShelf, CountStart } from "./screens/StockCount";
+import { StockControl } from "./screens/StockControl";
 import { Stores } from "./screens/Stores";
 import { loadSession, saveSession } from "./session";
 
@@ -59,6 +61,10 @@ export function App() {
         <Putaway api={api} storeId={route.storeId} />
       ) : route.screen === "count" ? (
         <CountStart api={api} storeId={route.storeId} />
+      ) : route.screen === "approvals" ? (
+        <Approvals api={api} storeId={route.storeId} />
+      ) : route.screen === "stock" ? (
+        <StockControl api={api} storeId={route.storeId} />
       ) : route.screen === "shelf" ? (
         <CountShelf key={route.locationId} api={api} storeId={route.storeId} locationId={route.locationId} />
       ) : route.screen === "queue" ? (

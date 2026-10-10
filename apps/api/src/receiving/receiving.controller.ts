@@ -63,6 +63,12 @@ export class ReceivingController {
     return this.receiving.recordReceipt(actorFor(user, storeId, key), body);
   }
 
+  @Get("goods-receipts")
+  @RequirePermission("purchasing.view")
+  listReceipts(@Param("storeId") storeId: string, @Query() query: Record<string, string>) {
+    return this.receiving.listReceipts(storeId, query);
+  }
+
   @Get("goods-receipts/:goodsReceiptId")
   @RequirePermission("purchasing.view")
   getReceipt(@Param("storeId") storeId: string, @Param("goodsReceiptId") id: string) {

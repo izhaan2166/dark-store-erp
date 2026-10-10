@@ -171,7 +171,68 @@ export interface StockRow {
   expiryDate: string | null;
   status: string;
   onHand: number;
+  /** On hand minus what orders have reserved. */
+  free: number;
 }
+
+export interface ReceiptSummary {
+  goodsReceiptId: string;
+  createdAt: string;
+  poNumber: string | null;
+  supplierName: string;
+  receivedByName: string;
+  lines: {
+    productId: string;
+    sku: string;
+    name: string;
+    lotCode: string | null;
+    expiryDate: string | null;
+    expectedQty: number;
+    acceptedQty: number;
+    damagedQty: number;
+    rejectedQty: number;
+    needsApproval: boolean;
+  }[];
+}
+
+export interface CountSummary {
+  stockCountId: string;
+  createdAt: string;
+  locationCode: string;
+  countedByName: string;
+  lines: {
+    productId: string;
+    sku: string;
+    name: string;
+    lotCode: string | null;
+    bookQty: number;
+    countedQty: number;
+    variance: number;
+    varianceValuePaise: number | null;
+    needsApproval: boolean;
+  }[];
+}
+
+export interface StockRequestSummary {
+  id: string;
+  kind: "release" | "write_off";
+  productId: string;
+  batchId: string | null;
+  fromLocationId: string;
+  quantity: number;
+  reason: string;
+  fromStatus: string;
+  createdAt: string;
+  sku: string;
+  productName: string;
+  lotCode: string | null;
+  expiryDate: string | null;
+  fromLocationCode: string;
+  toLocationCode: string | null;
+  requestedByName: string;
+}
+
+export type Decision = "approve" | "reject";
 
 /** An error the API explained, e.g. `wrong_item` or `insufficient_stock`. */
 export class ApiError extends Error {
@@ -304,6 +365,56 @@ export class Api {
 
   submitCount(storeId: string, body: { locationId: string; lines: CountLine[] }, key: string): Promise<CountView> {
     return this.call("POST", `/stores/${storeId}/stock-counts`, { body, key });
+  }
+
+  pendingReceipts(storeId: string): Promise<ReceiptSummary[]> {
+    return this.call("GET", `/stores/${storeId}/goods-receipts?status=pending_approval`);
+  }
+
+  pendingCounts(storeId: string): Promise<CountSummary[]> {
+    return this.call("GET", `/stores/${storeId}/stock-counts?status=pending_approval`);
+  }
+
+  pendingRequests(storeId: string): Promise<StockRequestSummary[]> {
+    return this.call("GET", `/stores/${storeId}/stock-requests?status=pending_approval`);
+  }
+
+  /** Approving a receipt posts its stock; rejecting cancels it. */
+  decideReceipt(storeId: string, id: string, decision: Decision, reason: string, key: string): Promise<unknown> {
+    const action = decision === "approve" ? "approve" : "cancel";
+    return this.call("POST", `/stores/${storeId}/goods-receipts/${id}/${action}`, { body: { reason }, key });
+  }
+
+  decideCount(storeId: string, id: string, decision: Decision, reason: string, key: string): Promise<unknown> {
+    return this.call("POST", `/stores/${storeId}/stock-counts/${id}/${decision}`, { body: { reason }, key });
+  }
+
+  decideRequest(storeId: string, id: string, decision: Decision, reason: string, key: string): Promise<unknown> {
+    return this.call("POST", `/stores/${storeId}/stock-requests/${id}/${decision}`, { body: { reason }, key });
+  }
+
+  quarantine(
+    storeId: string,
+    body: { productId: string; batchId: string | null; fromLocationId: string; toLocationId: string; quantity: number; reason: string },
+    key: string,
+  ): Promise<unknown> {
+    return this.call("POST", `/stores/${storeId}/quarantines`, { body, key });
+  }
+
+  requestRelease(
+    storeId: string,
+    body: { productId: string; batchId: string | null; fromLocationId: string; toLocationId: string; quantity: number; reason: string },
+    key: string,
+  ): Promise<unknown> {
+    return this.call("POST", `/stores/${storeId}/stock-requests/release`, { body, key });
+  }
+
+  requestWriteOff(
+    storeId: string,
+    body: { productId: string; batchId: string | null; locationId: string; status: string; quantity: number; reason: string },
+    key: string,
+  ): Promise<unknown> {
+    return this.call("POST", `/stores/${storeId}/stock-requests/write-off`, { body, key });
   }
 
   /**
