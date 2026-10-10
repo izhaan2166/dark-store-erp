@@ -50,6 +50,17 @@ export function PickOrder(props: { api: Api; storeId: string; orderId: string })
     api.fulfilment(storeId, orderId).then(show, fail);
   }, [api, storeId, orderId, show, fail]);
 
+  // Two people can tap the same order in the list at once; only the first starts it.
+  const start = async () => {
+    try {
+      show(await api.startPicking(storeId, orderId, newKey()));
+    } catch (err) {
+      if (!(err instanceof ApiError && err.status === 409)) throw err;
+      buzz();
+      setMessage({ kind: "error", text: "Someone else has just started picking this order. Go back to the list and choose another." });
+    }
+  };
+
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
     try {
@@ -128,7 +139,7 @@ export function PickOrder(props: { api: Api; storeId: string; orderId: string })
       )}
 
       {view.status === "accepted" && (
-        <button className="primary big" disabled={busy} onClick={() => run(async () => show(await api.startPicking(storeId, orderId, newKey())))}>
+        <button className="primary big" disabled={busy} onClick={() => run(start)}>
           Start picking
         </button>
       )}

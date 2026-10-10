@@ -4,6 +4,7 @@ import { CatalogService } from "../../src/catalog/catalog.service";
 import { DashboardService } from "../../src/dashboard/dashboard.service";
 import { CountsService } from "../../src/inventory/counts.service";
 import { LedgerService } from "../../src/inventory/ledger.service";
+import { OpeningStockService } from "../../src/inventory/opening-stock.service";
 import { ReconciliationService } from "../../src/inventory/reconciliation.service";
 import { StockControlService } from "../../src/inventory/stock-control.service";
 import { JobsService } from "../../src/jobs/jobs.service";
@@ -24,6 +25,7 @@ export interface TestContext {
   fulfilment: FulfilmentService;
   counts: CountsService;
   stockControl: StockControlService;
+  openingStock: OpeningStockService;
   jobs: JobsService;
   dashboard: DashboardService;
 }
@@ -40,6 +42,7 @@ export function createContext(poolSize = 60): TestContext {
     fulfilment: new FulfilmentService(handle, ledger),
     counts: new CountsService(handle, ledger),
     stockControl: new StockControlService(handle, ledger),
+    openingStock: new OpeningStockService(handle, ledger),
     jobs: new JobsService(handle, ledger),
     dashboard: new DashboardService(handle),
     orders: new OrdersService(handle),

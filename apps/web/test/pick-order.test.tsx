@@ -132,4 +132,12 @@ describe("pick order screen", () => {
     expect(await screen.findByLabelText("Scan an item")).toBeInTheDocument();
     expect(startPicking).toHaveBeenCalledTimes(1);
   });
+
+  it("says so when someone else started the order first", async () => {
+    const startPicking = vi.fn().mockRejectedValue(new ApiError(409, "invalid_state_transition", "Order cannot move from picking to picking"));
+    render(<PickOrder api={fakeApi({ fulfilment: vi.fn().mockResolvedValue(view({ status: "accepted" })), startPicking })} storeId="s1" orderId="order-1" />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Start picking" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Someone else has just started picking this order.");
+    expect(screen.queryByLabelText("Scan an item")).not.toBeInTheDocument();
+  });
 });

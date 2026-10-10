@@ -76,6 +76,11 @@ Frozen on 10 Oct 2026. Change them only when implementation or testing shows a r
 - Within the count-variance thresholds below the count posts at once; otherwise it waits for a Store Manager to approve or reject it with a reason. The unit cost used is the product's moving average when the count is submitted.
 - A count never removes units that orders have reserved. If the shelf holds fewer than are reserved, the count is refused and the picker reports a short pick first.
 
+## Opening stock
+
+- The pilot starts from counted stock. A Store Manager (`inventory.opening_stock`) loads each storage location's count as `opening_balance` movements straight into `available`, one per product and batch, with lot and expiry for batch-tracked products and, optionally, a unit cost that seeds the moving average.
+- A location can be loaded only while it has no stock history, so an opening load can never be used to correct stock after go-live; that goes through counts and their approvals. The location row is locked first (then product rows by id, then balance rows), so two loads into one location cannot both pass. Expired lots are refused.
+
 ## Quarantine and write-offs
 
 - Anyone with `inventory.adjust` can block free stock at once: a `status_change` movement from `available` in a storage bin to `quarantined` in a quarantine area, with a reason and an audit record. Blocking only makes less stock sellable, so it needs no approval.

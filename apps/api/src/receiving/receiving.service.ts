@@ -30,6 +30,7 @@ import { runIdempotent } from "../common/idempotency";
 import { withTransactionRetry } from "../common/retry";
 import { parse } from "../common/validation";
 import { DB_HANDLE } from "../database/database.tokens";
+import { applyAverageCost } from "../inventory/average-cost";
 import { LedgerService } from "../inventory/ledger.service";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
@@ -434,17 +435,7 @@ export class ReceivingService {
       const qty = accepted.reduce((n, l) => n + l.acceptedQty, 0);
       if (qty === 0) continue;
       const value = accepted.reduce((n, l) => n + l.acceptedQty * l.unitCostPaise, 0);
-      await tx.execute(sql`
-        WITH on_hand AS (
-          SELECT coalesce(sum(on_hand), 0)::bigint AS total FROM inventory_balances WHERE product_id = ${productId}
-        )
-        UPDATE products p
-        SET avg_unit_cost_paise = CASE
-          WHEN p.avg_unit_cost_paise IS NULL OR on_hand.total <= ${qty} THEN round(${value}::numeric / ${qty})
-          ELSE round((p.avg_unit_cost_paise::numeric * (on_hand.total - ${qty}) + ${value}) / on_hand.total)
-        END
-        FROM on_hand
-        WHERE p.id = ${productId}`);
+      await applyAverageCost(tx, productId, qty, value);
     }
 
     if (grn!.purchaseOrderId) {
