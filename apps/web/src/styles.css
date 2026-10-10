@@ -97,3 +97,17 @@ fieldset { border: 1px solid var(--line); border-radius: 10px; }
 .pack .count { font-weight: 700; font-size: 1.2rem; min-width: 4ch; text-align: right; }
 .pack .steppers { display: flex; gap: 6px; }
 .pack .steppers button { min-width: 48px; padding: 0; font-size: 1.3rem; }
+
+.receive { list-style: none; padding: 0; margin: 0 0 12px; }
+.receive li { display: grid; grid-template-columns: 1fr auto auto; gap: 8px 12px; align-items: center;
+  padding: 12px 4px; border-bottom: 1px solid var(--line); }
+.receive li.done { background: var(--green-soft); }
+.receive .what { display: flex; flex-direction: column; }
+.receive .count { font-weight: 700; font-size: 1.2rem; min-width: 3ch; text-align: right; }
+.receive .steppers { display: flex; gap: 6px; }
+.receive .steppers button { min-width: 48px; padding: 0; font-size: 1.3rem; }
+.receive .extra { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 0.9rem; }
+.receive .extra label { flex: 1 1 140px; }
+.small-stepper { display: inline-flex; align-items: center; gap: 6px; }
+.small-stepper button { min-height: 36px; min-width: 36px; padding: 0; }
+.row button { min-height: 40px; margin-left: auto; }

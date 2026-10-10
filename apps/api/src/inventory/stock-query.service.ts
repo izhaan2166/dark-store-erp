@@ -18,6 +18,7 @@ export const balanceQuerySchema = z.object({
 export type BalanceView = {
   productId: string;
   sku: string;
+  name: string;
   locationId: string;
   locationCode: string;
   batchId: string | null;
@@ -48,7 +49,7 @@ export class StockQueryService {
   async listBalances(storeId: string, query: unknown): Promise<{ items: BalanceView[]; limit: number; offset: number }> {
     const q = parse(balanceQuerySchema, query, "Invalid stock query");
     const result = await this.handle.db.execute<BalanceView>(sql`
-      SELECT b.product_id AS "productId", p.sku, b.location_id AS "locationId", l.code AS "locationCode",
+      SELECT b.product_id AS "productId", p.sku, p.name, b.location_id AS "locationId", l.code AS "locationCode",
              b.batch_id AS "batchId", bt.lot_code AS "lotCode",
              to_char(bt.expiry_date, 'YYYY-MM-DD') AS "expiryDate",
              b.status, b.on_hand AS "onHand", b.reserved, b.on_hand - b.reserved AS free

@@ -90,6 +90,76 @@ export type Resolution =
   | { resolution: "remove"; reason: string }
   | { resolution: "substitute"; reason: string; substituteProductId: string; quantity: number };
 
+export interface PurchaseOrderSummary {
+  purchaseOrderId: string;
+  poNumber: string;
+  supplierName: string;
+  status: string;
+  createdAt: string;
+  lineCount: number;
+  orderedUnits: number;
+  outstandingUnits: number;
+  pendingReceipts: number;
+}
+
+export interface PurchaseOrderLine {
+  purchaseOrderLineId: string;
+  lineNo: number;
+  productId: string;
+  sku: string;
+  name: string;
+  batchTracked: boolean;
+  orderedQty: number;
+  receivedQty: number;
+  outstandingQty: number;
+}
+
+export interface PurchaseOrderView {
+  purchaseOrderId: string;
+  poNumber: string;
+  supplierName: string;
+  status: string;
+  pendingReceipts: number;
+  lines: PurchaseOrderLine[];
+}
+
+export interface ReceiptLine {
+  productId: string;
+  acceptedQty: number;
+  damagedQty: number;
+  rejectedQty: number;
+  lotCode?: string;
+  expiryDate?: string;
+}
+
+export interface ReceiptView {
+  goodsReceiptId: string;
+  status: "pending_approval" | "posted" | "cancelled";
+  receivingLocationId: string;
+  lines: { productId: string; expectedQty: number; acceptedQty: number; needsApproval: boolean }[];
+  discrepancies: { goodsReceiptLineId: string; kind: string; quantity: number }[];
+}
+
+export interface Location {
+  locationId: string;
+  code: string;
+  purpose: string;
+  status: string;
+}
+
+export interface StockRow {
+  productId: string;
+  sku: string;
+  name: string;
+  locationId: string;
+  locationCode: string;
+  batchId: string | null;
+  lotCode: string | null;
+  expiryDate: string | null;
+  status: string;
+  onHand: number;
+}
+
 /** An error the API explained, e.g. `wrong_item` or `insufficient_stock`. */
 export class ApiError extends Error {
   constructor(
@@ -183,6 +253,40 @@ export class Api {
 
   handover(storeId: string, orderId: string, key: string): Promise<FulfilmentView> {
     return this.call("POST", `/stores/${storeId}/orders/${orderId}/handover`, { key });
+  }
+
+  purchaseOrders(storeId: string): Promise<PurchaseOrderSummary[]> {
+    return this.call("GET", `/stores/${storeId}/purchase-orders?status=open`);
+  }
+
+  purchaseOrder(storeId: string, purchaseOrderId: string): Promise<PurchaseOrderView> {
+    return this.call("GET", `/stores/${storeId}/purchase-orders/${purchaseOrderId}`);
+  }
+
+  recordReceipt(
+    storeId: string,
+    body: { purchaseOrderId: string; receivingLocationId: string; lines: ReceiptLine[] },
+    key: string,
+  ): Promise<ReceiptView> {
+    return this.call("POST", `/stores/${storeId}/goods-receipts`, { body, key });
+  }
+
+  locations(storeId: string): Promise<Location[]> {
+    return this.call("GET", `/stores/${storeId}/locations`);
+  }
+
+  stockRows(storeId: string, filter: { status?: string; productId?: string }): Promise<StockRow[]> {
+    const query = new URLSearchParams({ limit: "500" });
+    for (const [name, value] of Object.entries(filter)) if (value) query.set(name, value);
+    return this.call<{ items: StockRow[] }>("GET", `/stores/${storeId}/inventory?${query}`).then((r) => r.items);
+  }
+
+  putaway(
+    storeId: string,
+    body: { productId: string; batchId: string | null; fromLocationId: string; toLocationId: string; quantity: number },
+    key: string,
+  ): Promise<{ putawayId: string }> {
+    return this.call("POST", `/stores/${storeId}/putaways`, { body, key });
   }
 
   /**

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, Inject, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Headers, HttpCode, Inject, Param, Post, Query } from "@nestjs/common";
 import type { AuthUser } from "../auth/auth.service";
 import { CurrentUser, RequirePermission } from "../auth/decorators";
 import { idParam, requireIdempotencyKey } from "../common/http";
@@ -38,6 +38,12 @@ export class ReceivingController {
     @Body() body: CreatePurchaseOrderRequest,
   ) {
     return this.purchasing.createPurchaseOrder(actorFor(user, storeId, key), body);
+  }
+
+  @Get("purchase-orders")
+  @RequirePermission("purchasing.view")
+  listPurchaseOrders(@Param("storeId") storeId: string, @Query() query: Record<string, string>) {
+    return this.purchasing.listPurchaseOrders(storeId, query);
   }
 
   @Get("purchase-orders/:purchaseOrderId")
