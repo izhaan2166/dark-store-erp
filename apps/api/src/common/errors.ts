@@ -61,3 +61,9 @@ export class ForbiddenError extends DomainError {
   readonly code = "forbidden";
   readonly httpStatus = 403;
 }
+
+/** The request clashes with existing data, e.g. a duplicate code. */
+export class ConflictError extends DomainError {
+  readonly code = "conflict";
+  readonly httpStatus = 409;
+}

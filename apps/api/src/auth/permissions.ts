@@ -2,22 +2,30 @@ import type { userRole } from "@dse/db";
 
 export type Role = (typeof userRole.enumValues)[number];
 
-export type Permission = "orders.view" | "orders.create" | "orders.cancel";
-
-const ALL: readonly Permission[] = ["orders.view", "orders.create", "orders.cancel"];
+export const PERMISSIONS = [
+  "orders.view",
+  "orders.create",
+  "orders.cancel",
+  "purchasing.view",
+  "purchasing.manage",
+  "receiving.record",
+  "receiving.approve",
+  "inventory.putaway",
+] as const;
+export type Permission = (typeof PERMISSIONS)[number];
 
 /**
  * What each role may do. The backend enforces this on every request; the
  * screens only hide what a user cannot use. Add permissions as modules land.
  */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  super_admin: ALL,
-  store_manager: ["orders.view", "orders.create", "orders.cancel"],
-  inventory_manager: ["orders.view"],
-  receiving_staff: [],
+  super_admin: PERMISSIONS,
+  store_manager: PERMISSIONS,
+  inventory_manager: ["orders.view", "purchasing.view", "purchasing.manage", "receiving.record", "inventory.putaway"],
+  receiving_staff: ["purchasing.view", "receiving.record", "inventory.putaway"],
   picker: ["orders.view"],
   packer: ["orders.view"],
-  auditor: ["orders.view"],
+  auditor: ["orders.view", "purchasing.view"],
 };
 
 export function rolesGrant(roles: readonly Role[], permission: Permission): boolean {

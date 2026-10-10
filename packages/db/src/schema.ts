@@ -82,6 +82,18 @@ export const shortageSource = pgEnum("shortage_source", ["reservation", "short_p
 
 export const shortageStatus = pgEnum("shortage_status", ["open", "resolved"]);
 
+export const purchaseOrderStatus = pgEnum("purchase_order_status", ["open", "received", "cancelled"]);
+
+export const goodsReceiptStatus = pgEnum("goods_receipt_status", ["pending_approval", "posted", "cancelled"]);
+
+export const receivingDiscrepancyKind = pgEnum("receiving_discrepancy_kind", [
+  "short",
+  "excess",
+  "unordered",
+  "damaged",
+  "rejected",
+]);
+
 // ---------------------------------------------------------------------------
 // Stores, users, settings
 // ---------------------------------------------------------------------------
@@ -480,3 +492,153 @@ export const auditLogs = pgTable("audit_logs", {
   after: jsonb("after"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ---------------------------------------------------------------------------
+// Purchasing and receiving
+// ---------------------------------------------------------------------------
+
+export const suppliers = pgTable(
+  "suppliers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    status: recordStatus("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("suppliers_store_code").on(t.storeId, t.code)],
+);
+
+export const purchaseOrders = pgTable(
+  "purchase_orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => suppliers.id),
+    poNumber: text("po_number").notNull(),
+    /** `received` once every line's accepted quantity reaches what was ordered. */
+    status: purchaseOrderStatus("status").notNull().default("open"),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("purchase_orders_store_number").on(t.storeId, t.poNumber)],
+);
+
+export const purchaseOrderLines = pgTable(
+  "purchase_order_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    purchaseOrderId: uuid("purchase_order_id")
+      .notNull()
+      .references(() => purchaseOrders.id),
+    lineNo: integer("line_no").notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    orderedQty: integer("ordered_qty").notNull(),
+    /** Accepted units across posted receipts. Can exceed ordered after an approved excess. */
+    receivedQty: integer("received_qty").notNull().default(0),
+    unitCostPaise: integer("unit_cost_paise").notNull(),
+  },
+  (t) => [
+    unique("purchase_order_lines_po_line").on(t.purchaseOrderId, t.lineNo),
+    unique("purchase_order_lines_po_product").on(t.purchaseOrderId, t.productId),
+    check(
+      "purchase_order_lines_quantities",
+      sql`${t.orderedQty} > 0 AND ${t.receivedQty} >= 0 AND ${t.unitCostPaise} >= 0`,
+    ),
+  ],
+);
+
+/** A Goods Received Note. Stock moves only when it is posted. */
+export const goodsReceipts = pgTable(
+  "goods_receipts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id),
+    /** Null for an ad hoc receipt, which always needs approval. */
+    purchaseOrderId: uuid("purchase_order_id").references(() => purchaseOrders.id),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => suppliers.id),
+    receivingLocationId: uuid("receiving_location_id")
+      .notNull()
+      .references(() => locations.id),
+    status: goodsReceiptStatus("status").notNull(),
+    receivedBy: uuid("received_by")
+      .notNull()
+      .references(() => users.id),
+    decidedBy: uuid("decided_by").references(() => users.id),
+    decisionReason: text("decision_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("goods_receipts_store_status_idx").on(t.storeId, t.status),
+    check(
+      "goods_receipts_decision_recorded",
+      sql`${t.status} = 'posted' AND ${t.decidedBy} IS NULL
+        OR ${t.status} = 'pending_approval'
+        OR ${t.decidedBy} IS NOT NULL AND ${t.decisionReason} IS NOT NULL`,
+    ),
+  ],
+);
+
+export const goodsReceiptLines = pgTable(
+  "goods_receipt_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    goodsReceiptId: uuid("goods_receipt_id")
+      .notNull()
+      .references(() => goodsReceipts.id),
+    lineNo: integer("line_no").notNull(),
+    purchaseOrderLineId: uuid("purchase_order_line_id").references(() => purchaseOrderLines.id),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    batchId: uuid("batch_id").references(() => batches.id),
+    /** Outstanding quantity on the PO line when the receipt was recorded; 0 if unordered. */
+    expectedQty: integer("expected_qty").notNull(),
+    acceptedQty: integer("accepted_qty").notNull(),
+    damagedQty: integer("damaged_qty").notNull().default(0),
+    rejectedQty: integer("rejected_qty").notNull().default(0),
+    unitCostPaise: integer("unit_cost_paise").notNull(),
+    needsApproval: boolean("needs_approval").notNull(),
+  },
+  (t) => [
+    unique("goods_receipt_lines_grn_line").on(t.goodsReceiptId, t.lineNo),
+    check(
+      "goods_receipt_lines_quantities",
+      sql`${t.expectedQty} >= 0 AND ${t.acceptedQty} >= 0 AND ${t.damagedQty} >= 0
+        AND ${t.rejectedQty} >= 0 AND ${t.unitCostPaise} >= 0
+        AND ${t.acceptedQty} + ${t.damagedQty} + ${t.rejectedQty} > 0`,
+    ),
+  ],
+);
+
+export const receivingDiscrepancies = pgTable(
+  "receiving_discrepancies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    goodsReceiptLineId: uuid("goods_receipt_line_id")
+      .notNull()
+      .references(() => goodsReceiptLines.id),
+    kind: receivingDiscrepancyKind("kind").notNull(),
+    quantity: integer("quantity").notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("receiving_discrepancies_quantity_positive", sql`${t.quantity} > 0`)],
+);

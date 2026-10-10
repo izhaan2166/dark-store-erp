@@ -2,21 +2,13 @@ import { Body, Controller, Get, Headers, HttpCode, Inject, Param, Post } from "@
 import { z } from "zod";
 import type { AuthUser } from "../auth/auth.service";
 import { CurrentUser, RequirePermission } from "../auth/decorators";
-import { NotFoundError, ValidationError } from "../common/errors";
+import { ValidationError } from "../common/errors";
+import { idParam, requireIdempotencyKey } from "../common/http";
 import { type AcceptOrderRequest, OrdersService } from "./orders.service";
 
 const cancelSchema = z.object({ reason: z.string().trim().min(1).max(500) });
-const uuid = z.string().uuid();
-
-function orderIdParam(orderId: string): string {
-  if (!uuid.safeParse(orderId).success) throw new NotFoundError("Order not found", { orderId });
-  return orderId;
-}
-
-function idempotencyKey(key: string | undefined): string {
-  if (!key) throw new ValidationError("The Idempotency-Key header is required");
-  return key;
-}
+const orderIdParam = (orderId: string) => idParam(orderId, "Order");
+const idempotencyKey = requireIdempotencyKey;
 
 @Controller("stores/:storeId/orders")
 export class OrdersController {

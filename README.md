@@ -9,7 +9,7 @@ The build plan and every agreed decision live in [docs/decisions.md](docs/decisi
 | Path | What it is |
 | --- | --- |
 | `packages/db` | Drizzle schema, SQL migrations and the migration runner |
-| `apps/api` | NestJS API: sign-in and roles, inventory ledger, reservations, orders |
+| `apps/api` | NestJS API: sign-in and roles, inventory ledger, receiving, reservations, orders |
 | `docs` | Decisions, state machines and other design notes |
 
 ## Getting started
@@ -41,6 +41,13 @@ Sign in with `POST /auth/login` (`{ "email", "password" }`) and send the returne
 | `POST /stores/:storeId/orders` | `orders.create` |
 | `GET /stores/:storeId/orders/:orderId` | `orders.view` |
 | `POST /stores/:storeId/orders/:orderId/cancel` (`{ "reason" }`) | `orders.cancel` |
+| `POST /stores/:storeId/suppliers` | `purchasing.manage` |
+| `POST /stores/:storeId/purchase-orders` | `purchasing.manage` |
+| `GET /stores/:storeId/purchase-orders/:purchaseOrderId` | `purchasing.view` |
+| `POST /stores/:storeId/goods-receipts` | `receiving.record` |
+| `GET /stores/:storeId/goods-receipts/:goodsReceiptId` | `purchasing.view` |
+| `POST /stores/:storeId/goods-receipts/:goodsReceiptId/approve` or `/cancel` (`{ "reason" }`) | `receiving.approve` |
+| `POST /stores/:storeId/putaways` | `inventory.putaway` |
 
 Every write needs an `Idempotency-Key` header. Retrying with the same key and body returns the first result; the same key with a different body is rejected with `409 idempotency_key_reused`. Role permissions are in `apps/api/src/auth/permissions.ts`.
 

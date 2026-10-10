@@ -230,3 +230,71 @@ describe("order endpoints and permissions", () => {
     expect((await server.request("POST", path, { token, body: body(), key: randomUUID() })).status).toBe(404);
   });
 });
+
+describe("receiving endpoints and permissions", () => {
+  it("lets receiving staff record a receipt but only a store manager approve it", async () => {
+    const manager = await tokenFor([[store, "store_manager"]]);
+    const receiver = await tokenFor([[store, "receiving_staff"]]);
+    const picker = await tokenFor([[store, "picker"]]);
+    const auditor = await tokenFor([[store, "auditor"]]);
+    const productId = await createProduct(ctx);
+    const base = `/stores/${store.storeId}`;
+
+    const supplier = await server.request("POST", `${base}/suppliers`, {
+      token: manager.token,
+      body: { code: `SUP-${randomUUID().slice(0, 6)}`, name: "Supplier" },
+      key: randomUUID(),
+    });
+    expect(supplier.status).toBe(201);
+    const po = await server.request("POST", `${base}/purchase-orders`, {
+      token: manager.token,
+      body: {
+        supplierId: supplier.body.supplierId,
+        poNumber: `PO-${randomUUID().slice(0, 8)}`,
+        lines: [{ productId, quantity: 20, unitCostPaise: 1500 }],
+      },
+      key: randomUUID(),
+    });
+    expect(po.status).toBe(201);
+
+    // Receiving staff cannot raise purchase orders.
+    expect(
+      (
+        await server.request("POST", `${base}/purchase-orders`, {
+          token: receiver.token,
+          body: { supplierId: supplier.body.supplierId, poNumber: "PO-X", lines: [{ productId, quantity: 1, unitCostPaise: 1 }] },
+          key: randomUUID(),
+        })
+      ).status,
+    ).toBe(403);
+
+    const receipt = { purchaseOrderId: po.body.purchaseOrderId, receivingLocationId: store.receiving, lines: [{ productId, acceptedQty: 15 }] };
+    expect((await server.request("POST", `${base}/goods-receipts`, { token: picker.token, body: receipt, key: randomUUID() })).status).toBe(403);
+
+    const recorded = await server.request("POST", `${base}/goods-receipts`, { token: receiver.token, body: receipt, key: randomUUID() });
+    expect(recorded.status).toBe(201);
+    expect(recorded.body.status).toBe("pending_approval");
+    const grnPath = `${base}/goods-receipts/${recorded.body.goodsReceiptId}`;
+
+    expect((await server.request("GET", grnPath, { token: auditor.token })).status).toBe(200);
+    expect(
+      (await server.request("POST", `${grnPath}/approve`, { token: receiver.token, body: { reason: "ok" }, key: randomUUID() })).status,
+    ).toBe(403);
+
+    const approved = await server.request("POST", `${grnPath}/approve`, {
+      token: manager.token,
+      body: { reason: "Short delivery agreed with supplier" },
+      key: randomUUID(),
+    });
+    expect(approved.status).toBe(200);
+    expect(approved.body.status).toBe("posted");
+
+    const putaway = await server.request("POST", `${base}/putaways`, {
+      token: receiver.token,
+      body: { productId, fromLocationId: store.receiving, toLocationId: store.binA, quantity: 15 },
+      key: randomUUID(),
+    });
+    expect(putaway.status).toBe(201);
+    expect((await ctx.reconciliation.run(store.storeId)).ok).toBe(true);
+  });
+});

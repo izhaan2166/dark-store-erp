@@ -31,3 +31,27 @@ Rules on top of the table:
 ## Shortages
 
 - `open → resolved` only, with resolution, approver and time recorded (enforced by a check constraint).
+
+## Purchase orders
+
+| From | Allowed to |
+| --- | --- |
+| `open` | `received` (automatically, once every line's accepted quantity reaches what was ordered), `cancelled` |
+| `received` | none |
+| `cancelled` | none |
+
+A receipt can still be recorded against a `received` order; with nothing outstanding, any accepted units need approval.
+
+## Goods receipts
+
+Implemented in `apps/api/src/receiving/receiving.service.ts`.
+
+| From | Allowed to |
+| --- | --- |
+| (new, within tolerance) | `posted` |
+| (new, outside tolerance) | `pending_approval` |
+| `pending_approval` | `posted` (Store Manager approves with a reason), `cancelled` (Store Manager refuses with a reason) |
+| `posted` | none; corrections are reversal movements |
+| `cancelled` | none |
+
+Stock moves only on entry to `posted`.
