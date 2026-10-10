@@ -11,6 +11,7 @@ describe("routes", () => {
       { screen: "shortages", storeId: "s1" },
       { screen: "receive", storeId: "s1" },
       { screen: "receipt", storeId: "s1", purchaseOrderId: "po1" },
+      { screen: "new-purchase-order", storeId: "s1" },
       { screen: "putaway", storeId: "s1" },
       { screen: "count", storeId: "s1" },
       { screen: "approvals", storeId: "s1" },
@@ -36,6 +37,7 @@ describe("routes", () => {
     expect(permissionFor({ screen: "order", job: "pack", storeId: "s1", orderId: "o1" })).toBe("orders.pack");
     expect(permissionFor({ screen: "receipt", storeId: "s1", purchaseOrderId: "po1" })).toBe("receiving.record");
     expect(permissionFor({ screen: "putaway", storeId: "s1" })).toBe("inventory.putaway");
+    expect(permissionFor({ screen: "new-purchase-order", storeId: "s1" })).toBe("purchasing.manage");
     expect(permissionFor({ screen: "shelf", storeId: "s1", locationId: "a1" })).toBe("inventory.count");
     expect(permissionFor({ screen: "approvals", storeId: "s1" })).toBe("inventory.approve_request");
     expect(permissionFor({ screen: "stock", storeId: "s1" })).toBe("inventory.adjust");

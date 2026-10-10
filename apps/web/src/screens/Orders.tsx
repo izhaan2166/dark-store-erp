@@ -1,6 +1,7 @@
-import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { type AcceptedOrder, type Api, ApiError, newKey, type OrderSummary, type Product } from "../api";
 import { buzz } from "../buzz";
+import { backToScan, ItemLookup } from "../ItemLookup";
 import { href } from "../route";
 
 const REFRESH_MS = 30_000;
@@ -149,8 +150,6 @@ export function NewOrder(props: { api: Api; storeId: string }) {
   const { api, storeId } = props;
   const [ref, setRef] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
-  const [lookup, setLookup] = useState("");
-  const [results, setResults] = useState<Product[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ ref: string; short: string | null } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -162,7 +161,6 @@ export function NewOrder(props: { api: Api; storeId: string }) {
 
   const add = (product: Product) => {
     edited();
-    setResults(null);
     setError(null);
     setDone(null);
     setLines((all) => {
@@ -179,34 +177,6 @@ export function NewOrder(props: { api: Api; storeId: string }) {
     );
   };
 
-  const find = async (event: FormEvent) => {
-    event.preventDefault();
-    const text = lookup.trim();
-    if (!text) return;
-    setLookup("");
-    setError(null);
-    try {
-      add(await api.product(storeId, text));
-      return;
-    } catch (err) {
-      if (!(err instanceof ApiError && err.status === 404)) {
-        buzz();
-        setError(errorText(err, "Could not find the item"));
-        return;
-      }
-    }
-    try {
-      const found = await api.searchProducts(storeId, text);
-      if (found.length === 1) add(found[0]!);
-      else if (found.length === 0) {
-        buzz();
-        setError(`Nothing matches “${text}”`);
-      } else setResults(found);
-    } catch (err) {
-      setError(errorText(err, "Search failed"));
-    }
-  };
-
   const setQuantity = (productId: string, quantityText: string) => {
     edited();
     setLines((all) => all.map((l) => (l.product.productId === productId ? { ...l, quantityText } : l)));
@@ -215,12 +185,6 @@ export function NewOrder(props: { api: Api; storeId: string }) {
   const remove = (productId: string) => {
     edited();
     setLines((all) => all.filter((l) => l.product.productId !== productId));
-  };
-
-  const backToScan = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    document.getElementById("scan")?.focus();
   };
 
   const valid = ref.trim() !== "" && lines.length > 0 && lines.every((l) => lineQuantity(l.quantityText) !== null);
@@ -274,22 +238,8 @@ export function NewOrder(props: { api: Api; storeId: string }) {
             placeholder="From the app, phone or chat"
           />
         </label>
-        <form className="search" onSubmit={find}>
-          <input id="scan" aria-label="Add an item" placeholder="Scan, or type a name or SKU" value={lookup} onChange={(e) => setLookup(e.target.value)} />
-          <button>Add</button>
-        </form>
+        <ItemLookup api={api} storeId={storeId} onAdd={add} />
         {error && <p className="error" role="alert">{error}</p>}
-        {results && (
-          <ul className="list" aria-label="Matching items">
-            {results.map((p) => (
-              <li key={p.productId} className="row">
-                <strong>{p.name}</strong>
-                <span className="muted">{p.sku}</span>
-                <button onClick={() => add(p)}>Add</button>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
 
       {lines.length > 0 && (

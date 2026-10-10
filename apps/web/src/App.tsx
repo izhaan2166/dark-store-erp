@@ -7,6 +7,7 @@ import { PackOrder } from "./screens/PackOrder";
 import { PickOrder } from "./screens/PickOrder";
 import { Products } from "./screens/Products";
 import { Putaway } from "./screens/Putaway";
+import { NewPurchaseOrder } from "./screens/NewPurchaseOrder";
 import { ReceiveList } from "./screens/ReceiveList";
 import { ReceiveOrder } from "./screens/ReceiveOrder";
 import { Shelves } from "./screens/Shelves";
@@ -57,7 +58,9 @@ export function App() {
       ) : route.screen === "shortages" ? (
         <Shortages api={api} storeId={route.storeId} />
       ) : route.screen === "receive" ? (
-        <ReceiveList api={api} storeId={route.storeId} />
+        <ReceiveList api={api} storeId={route.storeId} canOrder={store?.permissions.includes("purchasing.manage") ?? false} />
+      ) : route.screen === "new-purchase-order" ? (
+        <NewPurchaseOrder api={api} storeId={route.storeId} />
       ) : route.screen === "receipt" ? (
         <ReceiveOrder key={route.purchaseOrderId} api={api} storeId={route.storeId} purchaseOrderId={route.purchaseOrderId} />
       ) : route.screen === "putaway" ? (

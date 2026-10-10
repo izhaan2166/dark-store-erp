@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import {
   auditLogs,
   goodsReceipts,
@@ -23,6 +23,8 @@ export const createSupplierSchema = z.object({
   name: z.string().trim().min(1).max(200),
 });
 export type CreateSupplierRequest = z.infer<typeof createSupplierSchema>;
+
+export type SupplierView = { supplierId: string; code: string; name: string };
 
 export const createPurchaseOrderSchema = z.object({
   supplierId: z.string().uuid(),
@@ -114,6 +116,15 @@ export class PurchasingService {
       }
       throw err;
     }
+  }
+
+  /** Active suppliers, by name, for the purchase order screen. */
+  async listSuppliers(storeId: string): Promise<SupplierView[]> {
+    return this.handle.db
+      .select({ supplierId: suppliers.id, code: suppliers.code, name: suppliers.name })
+      .from(suppliers)
+      .where(and(eq(suppliers.storeId, storeId), eq(suppliers.status, "active")))
+      .orderBy(asc(suppliers.name), asc(suppliers.id));
   }
 
   async createPurchaseOrder(actor: Actor, request: CreatePurchaseOrderRequest): Promise<PurchaseOrderView> {
