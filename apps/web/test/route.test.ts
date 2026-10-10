@@ -19,6 +19,8 @@ describe("routes", () => {
       { screen: "shelf", storeId: "s1", locationId: "a1" },
       { screen: "products", storeId: "s1" },
       { screen: "shelves", storeId: "s1" },
+      { screen: "orders", storeId: "s1" },
+      { screen: "new-order", storeId: "s1" },
       { screen: "opening-stock", storeId: "s1" },
     ] as const;
     for (const route of routes) expect(parseRoute(href(route))).toEqual(route);
@@ -28,6 +30,7 @@ describe("routes", () => {
     expect(parseRoute("#/stores/s1/teleport")).toEqual({ screen: "stores" });
     expect(parseRoute("#/stores/s1/putaway/x")).toEqual({ screen: "stores" });
     expect(parseRoute("#/stores/s1/receive/po1/extra")).toEqual({ screen: "stores" });
+    expect(parseRoute("#/stores/s1/orders/o1")).toEqual({ screen: "stores" });
   });
 
   it("names the permission each screen needs", () => {
@@ -41,6 +44,7 @@ describe("routes", () => {
     expect(permissionFor({ screen: "stock", storeId: "s1" })).toBe("inventory.adjust");
     expect(permissionFor({ screen: "products", storeId: "s1" })).toBe("catalog.manage");
     expect(permissionFor({ screen: "shelves", storeId: "s1" })).toBe("locations.manage");
+    expect(permissionFor({ screen: "new-order", storeId: "s1" })).toBe("orders.create");
     expect(permissionFor({ screen: "opening-stock", storeId: "s1" })).toBe("inventory.opening_stock");
   });
 });

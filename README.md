@@ -26,7 +26,7 @@ node apps/api/dist/main.js      # GET /health reports API and database status
 node apps/api/dist/worker.js    # background jobs: shortage escalation, expiry sweep
 ```
 
-The phone and tablet app lives in `apps/web` (React + Vite, installable as a PWA). For development run the API, then `pnpm --filter @dse/web dev`; it forwards `/api` calls to `API_URL` (default `http://localhost:3000`). In production serve `apps/web/dist` and the API from one origin, with `/api` routed to the API. It covers sign-in, picking, packing and handover with a keyboard-wedge or Bluetooth scanner, writing purchase orders (and adding suppliers), receiving deliveries against a purchase order, putting stock away on shelves, blind shelf counts, blocking and writing off problem stock, the Store Manager's approvals and missing-items list (reserve again, substitute, or send without it), and setting up products (with barcodes) and shelves.
+The phone and tablet app lives in `apps/web` (React + Vite, installable as a PWA). For development run the API, then `pnpm --filter @dse/web dev`; it forwards `/api` calls to `API_URL` (default `http://localhost:3000`). In production serve `apps/web/dist` and the API from one origin, with `/api` routed to the API. It covers sign-in, typing in customer orders (and cancelling them), picking, packing and handover with a keyboard-wedge or Bluetooth scanner, writing purchase orders (and adding suppliers), receiving deliveries against a purchase order, putting stock away on shelves, blind shelf counts, blocking and writing off problem stock, the Store Manager's approvals and missing-items list (reserve again, substitute, or send without it), and setting up products (with barcodes) and shelves.
 
 The worker runs every job once a minute (`WORKER_INTERVAL_MS` to change it). Running two workers is safe.
 
@@ -87,6 +87,34 @@ DATABASE_URL_TEST=postgres://postgres:postgres@localhost:5432/erp_test pnpm test
 ```
 
 The concurrency tests fire 50 simultaneous orders at 10 units of stock and check that no more than 10 are ever reserved, that opposite lock orders do not deadlock, and that cancellations racing with new orders leave the ledger reconciled.
+
+## Checking stock records
+
+`reconcile` compares every balance with the movement ledger, reserved quantities with open allocations, and order lines with their allocations. It prints any difference and exits 1, so it can run as a nightly job.
+
+```bash
+DATABASE_URL=... pnpm --filter @dse/api reconcile --store DS01
+```
+
+## Load test
+
+The load test uses [k6](https://k6.io) against a separate database whose name contains `loadtest` or `staging`; the seed script refuses any other. It creates a store with 5,000 products, 200 stocked bins and 30 staff.
+
+```bash
+createdb erp_loadtest
+DATABASE_URL=postgres://…/erp_loadtest pnpm db:migrate
+LOADTEST_DATABASE_URL=postgres://…/erp_loadtest pnpm --filter @dse/api loadtest:seed   # prints the store code
+DATABASE_URL=postgres://…/erp_loadtest PORT=3001 node apps/api/dist/main.js             # plus dist/worker.js
+
+cd apps/api/loadtest
+k6 run -e API_URL=http://localhost:3001 k6.js                                          # normal: 120 orders/hour, 20 staff
+k6 run -e API_URL=http://localhost:3001 -e ORDERS_PER_HOUR=240 -e STAFF=30 k6.js       # stress
+DATABASE_URL=postgres://…/erp_loadtest pnpm --filter @dse/api reconcile --store LOAD-…
+```
+
+Each run lasts 15 minutes (`-e DURATION=…` to change). It passes when every screen's p95 is under 2 seconds, no request gets a server error, and `reconcile` finds no differences.
+
+Pilot set-up, device testing and the nightly checks are in [docs/pilot.md](docs/pilot.md).
 
 ## Changing the schema
 

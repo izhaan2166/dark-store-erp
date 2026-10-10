@@ -10,7 +10,9 @@
     "dev:worker": "tsx watch src/worker.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "create-user": "node dist/cli/create-user.js"
+    "create-user": "node dist/cli/create-user.js",
+    "reconcile": "node dist/cli/reconcile.js",
+    "loadtest:seed": "tsx loadtest/seed.ts"
   },
   "dependencies": {
     "@dse/db": "workspace:*",
