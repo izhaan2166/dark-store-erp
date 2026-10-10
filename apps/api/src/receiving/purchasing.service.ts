@@ -6,6 +6,7 @@ import type { Actor } from "../common/actor";
 import { ConflictError, NotFoundError, ProductUnavailableError, ValidationError } from "../common/errors";
 import { runIdempotent } from "../common/idempotency";
 import { pgConstraint, pgErrorCode, withTransactionRetry } from "../common/retry";
+import { parse } from "../common/validation";
 import { DB_HANDLE } from "../database/database.tokens";
 
 export const createSupplierSchema = z.object({
@@ -166,10 +167,4 @@ export class PurchasingService {
       })),
     };
   }
-}
-
-export function parse<S extends z.ZodTypeAny>(schema: S, value: unknown, message: string): z.output<S> {
-  const parsed = schema.safeParse(value);
-  if (!parsed.success) throw new ValidationError(message, { issues: parsed.error.issues });
-  return parsed.data;
 }

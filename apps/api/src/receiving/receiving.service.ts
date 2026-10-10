@@ -27,9 +27,9 @@ import {
 } from "../common/errors";
 import { runIdempotent } from "../common/idempotency";
 import { withTransactionRetry } from "../common/retry";
+import { parse } from "../common/validation";
 import { DB_HANDLE } from "../database/database.tokens";
 import { LedgerService } from "../inventory/ledger.service";
-import { parse } from "./purchasing.service";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 
@@ -543,7 +543,9 @@ export class ReceivingService {
     const [location] = await tx
       .select({ purpose: locations.purpose, status: locations.status })
       .from(locations)
-      .where(and(eq(locations.id, locationId), eq(locations.storeId, storeId)));
+      .where(and(eq(locations.id, locationId), eq(locations.storeId, storeId)))
+      // Shared lock: a concurrent deactivation waits until this stock movement commits.
+      .for("share");
     if (!location) throw new NotFoundError("Location not found", { locationId });
     if (location.status !== "active" || location.purpose !== purpose) {
       throw new ValidationError(`Location must be an active ${purpose} location`, { locationId });

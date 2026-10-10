@@ -38,13 +38,19 @@ Frozen on 10 Oct 2026. Change them only when implementation or testing shows a r
 - Automatic cancellation is off (`auto_cancel_enabled = false`). When enabled later, the order waits in `cancel_pending` until the order source confirms; failures go to `exception` and release nothing.
 - Timeout jobs act through compare-and-set transitions that name the state they observed (see [state-machines.md](state-machines.md)).
 
+## Products and locations
+
+- The product catalogue is shared by the operator's stores, so products and barcodes carry no store id; locations belong to one store. Each barcode maps to exactly one product.
+- Storage locations are sellable (allocatable) by default; receiving, packing and quarantine areas never are. A location holding stock cannot be deactivated; receipts and putaways take a shared lock on their locations so a deactivation cannot slip in alongside.
+- An inactive product stays visible for history but cannot be ordered.
+
 ## Receiving
 
 - A goods receipt (GRN) is recorded in one request with every line's accepted, damaged and rejected quantities. Within tolerance it posts at once; outside tolerance it waits in `pending_approval` and moves no stock until a Store Manager approves or cancels it with a reason.
 - "Expected" for a line is what is still outstanding on the purchase order line when the receipt is recorded. Several lots of one product in one delivery are added up before the check.
 - Accepted units land in the receiving location with status `receiving`, which is never allocatable. Putaway into a storage bin as `available` is what makes them sellable. Expired batches are refused at receiving and at putaway.
 - Damaged units are recorded as received into the store's quarantine location with status `damaged`, so they are tracked but never sold. Rejected units never enter stock. Both always create a discrepancy record.
-- Lock order for receiving: purchase order row, then goods receipt row, then product rows by id, then balance rows by id.
+- Lock order for receiving: purchase order row, then goods receipt row, then location rows (shared), then product rows by id, then balance rows by id.
 
 ## Approval thresholds
 
