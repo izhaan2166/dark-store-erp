@@ -1,0 +1,441 @@
+import { sql } from "drizzle-orm";
+import {
+  bigint,
+  bigserial,
+  boolean,
+  check,
+  date,
+  index,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+export const recordStatus = pgEnum("record_status", ["active", "inactive"]);
+
+export const stockStatus = pgEnum("stock_status", [
+  "receiving",
+  "available",
+  "quarantined",
+  "damaged",
+  "expired",
+]);
+
+/** What a location is used for. Only `storage` locations can be allocatable. */
+export const locationPurpose = pgEnum("location_purpose", [
+  "storage",
+  "receiving",
+  "packing",
+  "quarantine",
+]);
+
+export const locationKind = pgEnum("location_kind", ["zone", "rack", "shelf", "bin"]);
+
+export const movementType = pgEnum("movement_type", [
+  "opening_balance",
+  "receipt",
+  "putaway",
+  "transfer",
+  "pick",
+  "return_to_stock",
+  "handover",
+  "status_change",
+  "adjustment",
+  "write_off",
+  "reversal",
+]);
+
+export const orderStatus = pgEnum("order_status", [
+  "accepted",
+  "picking",
+  "packing",
+  "ready_for_handover",
+  "handed_over",
+  "cancel_pending",
+  "cancelled",
+  "exception",
+]);
+
+export const reservationStatus = pgEnum("reservation_status", ["active", "closed"]);
+
+export const shortageSource = pgEnum("shortage_source", ["reservation", "short_pick", "quarantine"]);
+
+export const shortageStatus = pgEnum("shortage_status", ["open", "resolved"]);
+
+// ---------------------------------------------------------------------------
+// Stores, users, settings
+// ---------------------------------------------------------------------------
+
+export const stores = pgTable("stores", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  status: recordStatus("status").notNull().default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Per-store operational settings. Approval thresholds are editable defaults. */
+export const storeSettings = pgTable(
+  "store_settings",
+  {
+    storeId: uuid("store_id")
+      .primaryKey()
+      .references(() => stores.id),
+    timezone: text("timezone").notNull().default("Asia/Kolkata"),
+    shortageEscalationMinutes: integer("shortage_escalation_minutes").notNull().default(15),
+    autoCancelEnabled: boolean("auto_cancel_enabled").notNull().default(false),
+    /** Batches expiring within this many days are not allocated to new orders. */
+    sellByCutoffDays: integer("sell_by_cutoff_days").notNull().default(0),
+    countVarianceQtyThreshold: integer("count_variance_qty_threshold").notNull().default(2),
+    countVarianceValueThresholdPaise: integer("count_variance_value_threshold_paise")
+      .notNull()
+      .default(100_000),
+    receivingVariancePct: integer("receiving_variance_pct").notNull().default(5),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("store_settings_non_negative", sql`
+      ${t.shortageEscalationMinutes} > 0
+      AND ${t.sellByCutoffDays} >= 0
+      AND ${t.countVarianceQtyThreshold} >= 0
+      AND ${t.countVarianceValueThresholdPaise} >= 0
+      AND ${t.receivingVariancePct} >= 0`),
+  ],
+);
+
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull(),
+  passwordHash: text("password_hash"),
+  status: recordStatus("status").notNull().default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
+// Catalogue and locations
+// ---------------------------------------------------------------------------
+
+export const locations = pgTable(
+  "locations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id),
+    parentId: uuid("parent_id"),
+    code: text("code").notNull(),
+    kind: locationKind("kind").notNull(),
+    purpose: locationPurpose("purpose").notNull().default("storage"),
+    /** Stock here can be reserved for orders. Never true for packing, receiving or quarantine. */
+    allocatable: boolean("allocatable").notNull().default(false),
+    status: recordStatus("status").notNull().default("active"),
+  },
+  (t) => [
+    unique("locations_store_code").on(t.storeId, t.code),
+    check("locations_allocatable_storage_only", sql`NOT ${t.allocatable} OR ${t.purpose} = 'storage'`),
+  ],
+);
+
+export const products = pgTable(
+  "products",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sku: text("sku").notNull().unique(),
+    name: text("name").notNull(),
+    category: text("category").notNull(),
+    unitOfMeasure: text("unit_of_measure").notNull().default("each"),
+    batchTracked: boolean("batch_tracked").notNull().default(false),
+    status: recordStatus("status").notNull().default("active"),
+    /** Moving weighted-average unit cost, updated on accepted GRN lines. Null until first receipt. */
+    avgUnitCostPaise: integer("avg_unit_cost_paise"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check("products_cost_non_negative", sql`${t.avgUnitCostPaise} IS NULL OR ${t.avgUnitCostPaise} >= 0`)],
+);
+
+export const productBarcodes = pgTable("product_barcodes", {
+  barcode: text("barcode").primaryKey(),
+  productId: uuid("product_id")
+    .notNull()
+    .references(() => products.id),
+});
+
+export const batches = pgTable(
+  "batches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    lotCode: text("lot_code").notNull(),
+    expiryDate: date("expiry_date"),
+  },
+  (t) => [unique("batches_product_lot").on(t.productId, t.lotCode)],
+);
+
+// ---------------------------------------------------------------------------
+// Inventory ledger
+// ---------------------------------------------------------------------------
+
+/**
+ * Current operational balance per (store, location, product, batch, status).
+ * Maintained in the same transaction as every movement; `reserved` mirrors the
+ * open quantity of active reservation allocations against this row.
+ */
+export const inventoryBalances = pgTable(
+  "inventory_balances",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id),
+    locationId: uuid("location_id")
+      .notNull()
+      .references(() => locations.id),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    batchId: uuid("batch_id").references(() => batches.id),
+    status: stockStatus("status").notNull(),
+    onHand: integer("on_hand").notNull().default(0),
+    reserved: integer("reserved").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("inventory_balances_bucket")
+      .on(t.storeId, t.locationId, t.productId, t.batchId, t.status)
+      .nullsNotDistinct(),
+    check("inventory_balances_on_hand_non_negative", sql`${t.onHand} >= 0`),
+    check("inventory_balances_reserved_within_on_hand", sql`${t.reserved} >= 0 AND ${t.reserved} <= ${t.onHand}`),
+    check("inventory_balances_reserved_only_available", sql`${t.status} = 'available' OR ${t.reserved} = 0`),
+    index("inventory_balances_product_idx").on(t.storeId, t.productId, t.status),
+  ],
+);
+
+/** Append-only history of physical stock changes. UPDATE and DELETE are blocked by a trigger. */
+export const inventoryMovements = pgTable(
+  "inventory_movements",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    batchId: uuid("batch_id").references(() => batches.id),
+    fromLocationId: uuid("from_location_id").references(() => locations.id),
+    fromStatus: stockStatus("from_status"),
+    toLocationId: uuid("to_location_id").references(() => locations.id),
+    toStatus: stockStatus("to_status"),
+    quantity: integer("quantity").notNull(),
+    movementType: movementType("movement_type").notNull(),
+    sourceType: text("source_type").notNull(),
+    sourceId: text("source_id").notNull(),
+    reason: text("reason"),
+    reversesMovementId: bigint("reverses_movement_id", { mode: "number" }),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("inventory_movements_quantity_positive", sql`${t.quantity} > 0`),
+    check(
+      "inventory_movements_has_side",
+      sql`(${t.fromLocationId} IS NOT NULL AND ${t.fromStatus} IS NOT NULL)
+        OR (${t.toLocationId} IS NOT NULL AND ${t.toStatus} IS NOT NULL)`,
+    ),
+    check(
+      "inventory_movements_sides_complete",
+      sql`(${t.fromLocationId} IS NULL) = (${t.fromStatus} IS NULL)
+        AND (${t.toLocationId} IS NULL) = (${t.toStatus} IS NULL)`,
+    ),
+    index("inventory_movements_source_idx").on(t.sourceType, t.sourceId),
+    index("inventory_movements_product_idx").on(t.storeId, t.productId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Orders and reservations
+// ---------------------------------------------------------------------------
+
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id),
+    externalRef: text("external_ref").notNull(),
+    status: orderStatus("status").notNull().default("accepted"),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("orders_store_external_ref").on(t.storeId, t.externalRef)],
+);
+
+export const orderItems = pgTable(
+  "order_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id),
+    lineNo: integer("line_no").notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    /** Quantity the customer asked for. Never changes. */
+    requestedQty: integer("requested_qty").notNull(),
+    /** Units covered by open reservation allocations on this line. */
+    reservedQty: integer("reserved_qty").notNull().default(0),
+    pickedQty: integer("picked_qty").notNull().default(0),
+    fulfilledQty: integer("fulfilled_qty").notNull().default(0),
+  },
+  (t) => [
+    unique("order_items_order_line").on(t.orderId, t.lineNo),
+    check("order_items_requested_positive", sql`${t.requestedQty} > 0`),
+    check(
+      "order_items_quantities_ordered",
+      sql`${t.reservedQty} >= 0
+        AND ${t.reservedQty} <= ${t.requestedQty}
+        AND 0 <= ${t.fulfilledQty}
+        AND ${t.fulfilledQty} <= ${t.pickedQty}
+        AND ${t.pickedQty} <= ${t.requestedQty}`,
+    ),
+  ],
+);
+
+export const stockReservations = pgTable("stock_reservations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orderId: uuid("order_id")
+    .notNull()
+    .unique()
+    .references(() => orders.id),
+  status: reservationStatus("status").notNull().default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+});
+
+/**
+ * One allocation of a reservation to one balance row. Open quantity is
+ * quantity - consumed_qty - released_qty, and the sum of open quantities per
+ * balance row must equal that row's `reserved`.
+ */
+export const reservationAllocations = pgTable(
+  "reservation_allocations",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    reservationId: uuid("reservation_id")
+      .notNull()
+      .references(() => stockReservations.id),
+    orderItemId: uuid("order_item_id")
+      .notNull()
+      .references(() => orderItems.id),
+    balanceId: bigint("balance_id", { mode: "number" })
+      .notNull()
+      .references(() => inventoryBalances.id),
+    quantity: integer("quantity").notNull(),
+    consumedQty: integer("consumed_qty").notNull().default(0),
+    releasedQty: integer("released_qty").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check(
+      "reservation_allocations_quantities",
+      sql`${t.quantity} > 0
+        AND ${t.consumedQty} >= 0
+        AND ${t.releasedQty} >= 0
+        AND ${t.consumedQty} + ${t.releasedQty} <= ${t.quantity}`,
+    ),
+    index("reservation_allocations_balance_idx").on(t.balanceId),
+    index("reservation_allocations_item_idx").on(t.orderItemId),
+  ],
+);
+
+export const orderItemShortages = pgTable(
+  "order_item_shortages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderItemId: uuid("order_item_id")
+      .notNull()
+      .references(() => orderItems.id),
+    source: shortageSource("source").notNull(),
+    quantity: integer("quantity").notNull(),
+    status: shortageStatus("status").notNull().default("open"),
+    resolution: text("resolution"),
+    resolvedBy: uuid("resolved_by").references(() => users.id),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("order_item_shortages_quantity_positive", sql`${t.quantity} > 0`),
+    check(
+      "order_item_shortages_resolution_complete",
+      sql`${t.status} = 'open' OR (${t.resolution} IS NOT NULL AND ${t.resolvedBy} IS NOT NULL AND ${t.resolvedAt} IS NOT NULL)`,
+    ),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Cross-cutting: idempotency, outbox, audit
+// ---------------------------------------------------------------------------
+
+export const idempotencyKeys = pgTable(
+  "idempotency_keys",
+  {
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id),
+    scope: text("scope").notNull(),
+    key: text("key").notNull(),
+    requestHash: text("request_hash").notNull(),
+    response: jsonb("response"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ name: "idempotency_keys_pk", columns: [t.storeId, t.scope, t.key] })],
+);
+
+export const outboxEvents = pgTable(
+  "outbox_events",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id),
+    eventType: text("event_type").notNull(),
+    payload: jsonb("payload").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => [index("outbox_events_unprocessed_idx").on(t.id).where(sql`${t.processedAt} IS NULL`)],
+);
+
+export const auditLogs = pgTable("audit_logs", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  storeId: uuid("store_id").references(() => stores.id),
+  actorUserId: uuid("actor_user_id")
+    .notNull()
+    .references(() => users.id),
+  action: text("action").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: text("entity_id").notNull(),
+  before: jsonb("before"),
+  after: jsonb("after"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
