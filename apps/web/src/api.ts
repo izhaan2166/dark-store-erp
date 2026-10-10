@@ -71,6 +71,7 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    readonly details: unknown = null,
   ) {
     super(message);
   }
@@ -132,6 +133,14 @@ export class Api {
     return this.call("POST", `/stores/${storeId}/orders/${orderId}/complete-picking`, { key });
   }
 
+  pack(storeId: string, orderId: string, lines: { orderItemId: string; quantity: number }[], key: string): Promise<FulfilmentView> {
+    return this.call("POST", `/stores/${storeId}/orders/${orderId}/pack`, { body: { lines }, key });
+  }
+
+  handover(storeId: string, orderId: string, key: string): Promise<FulfilmentView> {
+    return this.call("POST", `/stores/${storeId}/orders/${orderId}/handover`, { key });
+  }
+
   /**
    * Sends one request. A write is retried once with the same key if the
    * network drops, so a scan that reached the server is never applied twice.
@@ -159,8 +168,13 @@ export class Api {
     if (response.status === 204) return undefined as T;
     const data: unknown = await response.json().catch(() => null);
     if (!response.ok) {
-      const error = (data as { error?: { code?: string; message?: string } } | null)?.error;
-      throw new ApiError(response.status, error?.code ?? "error", error?.message ?? `Request failed (${response.status})`);
+      const error = (data as { error?: { code?: string; message?: string; details?: unknown } } | null)?.error;
+      throw new ApiError(
+        response.status,
+        error?.code ?? "error",
+        error?.message ?? `Request failed (${response.status})`,
+        error?.details ?? null,
+      );
     }
     return data as T;
   }

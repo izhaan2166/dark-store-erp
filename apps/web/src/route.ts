@@ -1,18 +1,23 @@
 import { useEffect, useState } from "react";
 
 /**
- * Screens live in the URL hash (#/stores/<id>/pick/<orderId>) so a refresh or
+ * Screens live in the URL hash (#/stores/<id>/pick/<orderId>, …/pack/<orderId>) so a refresh or
  * the back button keeps the picker where they were.
  */
+export type Job = "pick" | "pack";
+
 export type Route =
   | { screen: "stores" }
-  | { screen: "queue"; storeId: string }
-  | { screen: "pick"; storeId: string; orderId: string };
+  | { screen: "queue"; job: Job; storeId: string }
+  | { screen: "order"; job: Job; storeId: string; orderId: string };
 
 export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
-  if (parts[0] === "stores" && parts[1] && parts[2] === "pick") {
-    return parts[3] ? { screen: "pick", storeId: parts[1], orderId: parts[3] } : { screen: "queue", storeId: parts[1] };
+  const job = parts[2];
+  if (parts[0] === "stores" && parts[1] && (job === "pick" || job === "pack")) {
+    return parts[3]
+      ? { screen: "order", job, storeId: parts[1], orderId: parts[3] }
+      : { screen: "queue", job, storeId: parts[1] };
   }
   return { screen: "stores" };
 }
@@ -22,9 +27,9 @@ export function href(route: Route): string {
     case "stores":
       return "#/";
     case "queue":
-      return `#/stores/${route.storeId}/pick`;
-    case "pick":
-      return `#/stores/${route.storeId}/pick/${route.orderId}`;
+      return `#/stores/${route.storeId}/${route.job}`;
+    case "order":
+      return `#/stores/${route.storeId}/${route.job}/${route.orderId}`;
   }
 }
 

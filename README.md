@@ -26,7 +26,7 @@ node apps/api/dist/main.js      # GET /health reports API and database status
 node apps/api/dist/worker.js    # background jobs: shortage escalation, expiry sweep
 ```
 
-The phone and tablet app lives in `apps/web` (React + Vite, installable as a PWA). For development run the API, then `pnpm --filter @dse/web dev`; it forwards `/api` calls to `API_URL` (default `http://localhost:3000`). In production serve `apps/web/dist` and the API from one origin, with `/api` routed to the API. It covers sign-in and picking with a keyboard-wedge or Bluetooth scanner so far; other screens follow.
+The phone and tablet app lives in `apps/web` (React + Vite, installable as a PWA). For development run the API, then `pnpm --filter @dse/web dev`; it forwards `/api` calls to `API_URL` (default `http://localhost:3000`). In production serve `apps/web/dist` and the API from one origin, with `/api` routed to the API. It covers sign-in, picking, packing and handover with a keyboard-wedge or Bluetooth scanner so far; other screens follow.
 
 The worker runs every job once a minute (`WORKER_INTERVAL_MS` to change it). Running two workers is safe.
 
