@@ -36,6 +36,13 @@
       "when": 1791652882233,
       "tag": "0004_order_packing_location",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791653286978,
+      "tag": "0005_stock_counts",
+      "breakpoints": true
     }
   ]
 }

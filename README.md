@@ -43,6 +43,9 @@ Sign in with `POST /auth/login` (`{ "email", "password" }`) and send the returne
 | `GET /stores/:storeId/locations` | `catalog.view` |
 | `POST /stores/:storeId/locations` · `PATCH …/locations/:locationId` | `locations.manage` |
 | `GET /stores/:storeId/inventory?productId=&locationId=&status=` · `GET …/inventory/products/:productId` | `inventory.view` |
+| `POST /stores/:storeId/stock-counts` (`{ "locationId", "lines": [{ "productId", "batchId", "countedQty" }] }`) | `inventory.count` |
+| `GET /stores/:storeId/stock-counts/:stockCountId` | `inventory.view` |
+| `POST …/stock-counts/:stockCountId/approve` or `/reject` (`{ "reason" }`) | `inventory.approve_count` |
 | `POST /stores/:storeId/orders` | `orders.create` |
 | `GET /stores/:storeId/orders/:orderId` | `orders.view` |
 | `POST /stores/:storeId/orders/:orderId/cancel` (`{ "reason" }`) | `orders.cancel` |

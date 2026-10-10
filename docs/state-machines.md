@@ -61,3 +61,14 @@ Implemented in `apps/api/src/receiving/receiving.service.ts`.
 | `cancelled` | none |
 
 Stock moves only on entry to `posted`.
+
+## Stock counts
+
+Implemented in `apps/api/src/inventory/counts.service.ts`.
+
+| From | Allowed to |
+| --- | --- |
+| (new, within thresholds) | `posted` |
+| (new, outside thresholds or releasing blocked units) | `pending_approval` |
+| `pending_approval` | `posted` (Store Manager approves with a reason), `rejected` (Store Manager rejects with a reason) |
+| `posted`, `rejected` | none |
