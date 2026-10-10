@@ -23,6 +23,16 @@ import {
 
 export const recordStatus = pgEnum("record_status", ["active", "inactive"]);
 
+export const userRole = pgEnum("user_role", [
+  "super_admin",
+  "store_manager",
+  "inventory_manager",
+  "receiving_staff",
+  "picker",
+  "packer",
+  "auditor",
+]);
+
 export const stockStatus = pgEnum("stock_status", [
   "receiving",
   "available",
@@ -121,6 +131,37 @@ export const users = pgTable("users", {
   status: recordStatus("status").notNull().default("active"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Roles are granted per store; one person may hold several. */
+export const userStoreRoles = pgTable(
+  "user_store_roles",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id),
+    role: userRole("role").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ name: "user_store_roles_pk", columns: [t.userId, t.storeId, t.role] })],
+);
+
+/** Login sessions. Only a SHA-256 hash of the bearer token is stored. */
+export const authSessions = pgTable(
+  "auth_sessions",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [index("auth_sessions_user_idx").on(t.userId)],
+);
 
 // ---------------------------------------------------------------------------
 // Catalogue and locations

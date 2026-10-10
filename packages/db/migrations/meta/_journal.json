@@ -15,6 +15,13 @@
       "when": 1791650211404,
       "tag": "0001_append_only_movements",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791651411462,
+      "tag": "0002_auth",
+      "breakpoints": true
     }
   ]
 }

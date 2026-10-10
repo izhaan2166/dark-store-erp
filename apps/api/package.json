@@ -7,7 +7,8 @@
     "start": "node dist/main.js",
     "dev": "tsx watch src/main.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "create-user": "node dist/cli/create-user.js"
   },
   "dependencies": {
     "@dse/db": "workspace:*",

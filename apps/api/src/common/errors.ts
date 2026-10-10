@@ -44,3 +44,20 @@ export class InvalidStateTransitionError extends DomainError {
   readonly code = "invalid_state_transition";
   readonly httpStatus = 409;
 }
+
+/** No valid session: the token is missing, unknown, expired or revoked. */
+export class UnauthenticatedError extends DomainError {
+  readonly code = "unauthenticated";
+  readonly httpStatus = 401;
+}
+
+export class InvalidCredentialsError extends DomainError {
+  readonly code = "invalid_credentials";
+  readonly httpStatus = 401;
+}
+
+/** Signed in, but no role in this store grants the action. */
+export class ForbiddenError extends DomainError {
+  readonly code = "forbidden";
+  readonly httpStatus = 403;
+}
