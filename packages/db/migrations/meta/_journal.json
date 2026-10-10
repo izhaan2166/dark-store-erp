@@ -29,6 +29,13 @@
       "when": 1791651852480,
       "tag": "0003_receiving",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791652882233,
+      "tag": "0004_order_packing_location",
+      "breakpoints": true
     }
   ]
 }

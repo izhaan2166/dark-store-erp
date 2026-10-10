@@ -7,7 +7,6 @@ import {
   orders,
   outboxEvents,
   products,
-  reservationAllocations,
   stockReservations,
   storeSettings,
   stores,
@@ -26,6 +25,7 @@ import type { Actor } from "../common/actor";
 import { runIdempotent } from "../common/idempotency";
 import { pgConstraint, pgErrorCode, withTransactionRetry } from "../common/retry";
 import { DB_HANDLE } from "../database/database.tokens";
+import { type AllocationView, allocateLine, lockEligibleBalances } from "./allocation";
 import { transitionOrder } from "./order-state";
 
 export const acceptOrderSchema = z.object({
@@ -42,13 +42,7 @@ export const acceptOrderSchema = z.object({
 });
 export type AcceptOrderRequest = z.infer<typeof acceptOrderSchema>;
 
-export interface AllocationView {
-  balanceId: number;
-  locationId: string;
-  batchId: string | null;
-  expiryDate: string | null;
-  quantity: number;
-}
+export type { AllocationView } from "./allocation";
 
 export interface OrderLineView {
   orderItemId: string;
@@ -93,15 +87,6 @@ export interface OrderView {
 
 export type { Actor } from "../common/actor";
 
-type EligibleRow = {
-  id: string;
-  product_id: string;
-  batch_id: string | null;
-  location_id: string;
-  on_hand: number;
-  reserved: number;
-  expiry_date: string | null;
-};
 
 @Injectable()
 export class OrdersService {
@@ -153,7 +138,7 @@ export class OrdersService {
 
   private async acceptInTx(tx: DbExecutor, actor: Actor, body: AcceptOrderRequest): Promise<AcceptOrderResult> {
     const [store] = await tx
-      .select({ status: stores.status, timezone: storeSettings.timezone, cutoff: storeSettings.sellByCutoffDays })
+      .select({ status: stores.status })
       .from(stores)
       .innerJoin(storeSettings, eq(storeSettings.storeId, stores.id))
       .where(eq(stores.id, actor.storeId));
@@ -188,24 +173,7 @@ export class OrdersService {
 
     // Lock order is the primary key, not expiry: every transaction that touches
     // these rows takes them in the same order. FEFO is applied afterwards.
-    const eligible = await tx.execute<EligibleRow>(sql`
-      SELECT b.id, b.product_id, b.batch_id, b.location_id, b.on_hand, b.reserved,
-             to_char(bt.expiry_date, 'YYYY-MM-DD') AS expiry_date
-      FROM inventory_balances b
-      JOIN locations l ON l.id = b.location_id
-      LEFT JOIN batches bt ON bt.id = b.batch_id
-      WHERE b.store_id = ${actor.storeId}
-        AND b.product_id IN (${sql.join(
-          productIds.map((id) => sql`${id}`),
-          sql`, `,
-        )})
-        AND b.status = 'available'
-        AND l.allocatable
-        AND l.status = 'active'
-        AND (bt.expiry_date IS NULL
-             OR bt.expiry_date > (now() AT TIME ZONE ${store.timezone})::date + ${store.cutoff}::int)
-      ORDER BY b.id
-      FOR UPDATE OF b`);
+    const eligible = await lockEligibleBalances(tx, actor.storeId, productIds);
 
     const [reservation] = await tx
       .insert(stockReservations)
@@ -215,44 +183,12 @@ export class OrdersService {
     const lines: OrderLineView[] = [];
     for (const line of body.lines) {
       const item = items.find((it) => it.productId === line.productId)!;
-      const candidates = eligible.rows
-        .filter((r) => r.product_id === line.productId && r.on_hand - r.reserved > 0)
-        .sort(fefo);
-
-      let remaining = line.quantity;
-      const allocations: AllocationView[] = [];
-      for (const row of candidates) {
-        if (remaining === 0) break;
-        const take = Math.min(remaining, row.on_hand - row.reserved);
-        row.reserved += take;
-        remaining -= take;
-        allocations.push({
-          balanceId: Number(row.id),
-          locationId: row.location_id,
-          batchId: row.batch_id,
-          expiryDate: row.expiry_date,
-          quantity: take,
-        });
-      }
-
+      const { allocations, remaining } = await allocateLine(
+        tx,
+        { reservationId: reservation!.id, orderItemId: item.id, productId: line.productId, quantity: line.quantity },
+        eligible,
+      );
       const reservedQty = line.quantity - remaining;
-      if (allocations.length > 0) {
-        await tx.insert(reservationAllocations).values(
-          allocations.map((a) => ({
-            reservationId: reservation!.id,
-            orderItemId: item.id,
-            balanceId: a.balanceId,
-            quantity: a.quantity,
-          })),
-        );
-        for (const a of allocations) {
-          await tx.execute(sql`
-            UPDATE inventory_balances
-            SET reserved = reserved + ${a.quantity}, updated_at = now()
-            WHERE id = ${a.balanceId}`);
-        }
-        await tx.update(orderItems).set({ reservedQty }).where(eq(orderItems.id, item.id));
-      }
       if (remaining > 0) {
         await tx.insert(orderItemShortages).values({ orderItemId: item.id, source: "reservation", quantity: remaining });
       }
@@ -428,11 +364,3 @@ export class OrdersService {
 }
 
 /** Earliest expiry first; undated stock last; then by row id for a stable order. */
-function fefo(a: EligibleRow, b: EligibleRow): number {
-  if (a.expiry_date !== b.expiry_date) {
-    if (a.expiry_date === null) return 1;
-    if (b.expiry_date === null) return -1;
-    return a.expiry_date < b.expiry_date ? -1 : 1;
-  }
-  return Number(a.id) - Number(b.id);
-}
