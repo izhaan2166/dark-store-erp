@@ -78,7 +78,7 @@ export const orderStatus = pgEnum("order_status", [
 
 export const reservationStatus = pgEnum("reservation_status", ["active", "closed"]);
 
-export const shortageSource = pgEnum("shortage_source", ["reservation", "short_pick", "quarantine"]);
+export const shortageSource = pgEnum("shortage_source", ["reservation", "short_pick", "quarantine", "expired"]);
 
 export const shortageStatus = pgEnum("shortage_status", ["open", "resolved"]);
 
@@ -140,6 +140,12 @@ export const storeSettings = pgTable(
       AND ${t.receivingVariancePct} >= 0`),
   ],
 );
+
+/**
+ * The account background jobs act as. Seeded by migration; it has no
+ * password and no roles, so nobody can sign in as it.
+ */
+export const SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -443,8 +449,11 @@ export const orderItemShortages = pgTable(
     resolvedBy: uuid("resolved_by").references(() => users.id),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Set once by the worker when the shortage stays open past the store's escalation time. */
+    escalatedAt: timestamp("escalated_at", { withTimezone: true }),
   },
   (t) => [
+    index("order_item_shortages_open_idx").on(t.createdAt).where(sql`${t.status} = 'open' AND ${t.escalatedAt} IS NULL`),
     check("order_item_shortages_quantity_positive", sql`${t.quantity} > 0`),
     check(
       "order_item_shortages_resolution_complete",

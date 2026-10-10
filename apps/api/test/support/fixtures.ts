@@ -5,6 +5,7 @@ import { CountsService } from "../../src/inventory/counts.service";
 import { LedgerService } from "../../src/inventory/ledger.service";
 import { ReconciliationService } from "../../src/inventory/reconciliation.service";
 import { StockControlService } from "../../src/inventory/stock-control.service";
+import { JobsService } from "../../src/jobs/jobs.service";
 import { FulfilmentService } from "../../src/orders/fulfilment.service";
 import { OrdersService } from "../../src/orders/orders.service";
 import { PurchasingService } from "../../src/receiving/purchasing.service";
@@ -22,6 +23,7 @@ export interface TestContext {
   fulfilment: FulfilmentService;
   counts: CountsService;
   stockControl: StockControlService;
+  jobs: JobsService;
 }
 
 export function createContext(poolSize = 60): TestContext {
@@ -36,6 +38,7 @@ export function createContext(poolSize = 60): TestContext {
     fulfilment: new FulfilmentService(handle, ledger),
     counts: new CountsService(handle, ledger),
     stockControl: new StockControlService(handle, ledger),
+    jobs: new JobsService(handle, ledger),
     orders: new OrdersService(handle),
     reconciliation: new ReconciliationService(handle),
   };
@@ -56,7 +59,7 @@ const suffix = () => randomUUID().slice(0, 8);
 /** A fresh store with two allocatable bins and the non-allocatable areas. */
 export async function createStore(
   ctx: TestContext,
-  settings: { sellByCutoffDays?: number; timezone?: string } = {},
+  settings: { sellByCutoffDays?: number; timezone?: string; shortageEscalationMinutes?: number } = {},
 ): Promise<TestStore> {
   const { db } = ctx.handle;
   const [store] = await db.insert(stores).values({ code: `S-${suffix()}`, name: "Test store" }).returning();
