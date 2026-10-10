@@ -22,6 +22,7 @@ import {
   ProductUnavailableError,
   ValidationError,
 } from "../common/errors";
+import type { Actor } from "../common/actor";
 import { runIdempotent } from "../common/idempotency";
 import { pgConstraint, pgErrorCode, withTransactionRetry } from "../common/retry";
 import { DB_HANDLE } from "../database/database.tokens";
@@ -90,11 +91,7 @@ export interface OrderView {
   }[];
 }
 
-export interface Actor {
-  storeId: string;
-  actorUserId: string;
-  idempotencyKey: string;
-}
+export type { Actor } from "../common/actor";
 
 type EligibleRow = {
   id: string;

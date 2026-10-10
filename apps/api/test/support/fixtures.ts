@@ -3,6 +3,8 @@ import { batches, createDb, locations, products, storeSettings, stores, users, t
 import { LedgerService } from "../../src/inventory/ledger.service";
 import { ReconciliationService } from "../../src/inventory/reconciliation.service";
 import { OrdersService } from "../../src/orders/orders.service";
+import { PurchasingService } from "../../src/receiving/purchasing.service";
+import { ReceivingService } from "../../src/receiving/receiving.service";
 import { TEST_DATABASE_URL } from "./env";
 
 export interface TestContext {
@@ -10,13 +12,18 @@ export interface TestContext {
   ledger: LedgerService;
   orders: OrdersService;
   reconciliation: ReconciliationService;
+  purchasing: PurchasingService;
+  receiving: ReceivingService;
 }
 
 export function createContext(poolSize = 60): TestContext {
   const handle = createDb(TEST_DATABASE_URL, { max: poolSize });
+  const ledger = new LedgerService(handle);
   return {
     handle,
-    ledger: new LedgerService(handle),
+    ledger,
+    purchasing: new PurchasingService(handle),
+    receiving: new ReceivingService(handle, ledger),
     orders: new OrdersService(handle),
     reconciliation: new ReconciliationService(handle),
   };
