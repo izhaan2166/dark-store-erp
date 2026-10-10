@@ -24,6 +24,7 @@ import {
 import type { Actor } from "../common/actor";
 import { runIdempotent } from "../common/idempotency";
 import { pgConstraint, pgErrorCode, withTransactionRetry } from "../common/retry";
+import { parse } from "../common/validation";
 import { DB_HANDLE } from "../database/database.tokens";
 import { type AllocationView, allocateLine, lockEligibleBalances } from "./allocation";
 import { transitionOrder } from "./order-state";
@@ -85,6 +86,28 @@ export interface OrderView {
     substitutesItemId: string | null;
   }[];
 }
+
+export type OrderSummary = {
+  orderId: string;
+  externalRef: string;
+  status: string;
+  createdAt: string;
+  lineCount: number;
+  requestedUnits: number;
+  pickedUnits: number;
+  openShortages: number;
+};
+
+const orderStatuses = ["accepted", "picking", "packing", "ready_for_handover", "handed_over", "cancel_pending", "cancelled", "exception"] as const;
+
+export const listOrdersSchema = z.object({
+  /** Comma-separated statuses; defaults to the orders still being worked on. */
+  status: z
+    .string()
+    .default("accepted,picking,packing")
+    .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean))
+    .pipe(z.array(z.enum(orderStatuses)).min(1).max(orderStatuses.length)),
+});
 
 export type { Actor } from "../common/actor";
 
@@ -235,6 +258,29 @@ export class OrdersService {
   }
 
   /** Current state of one order in the store, with each line's quantities. */
+  /** Orders waiting for work, oldest first: what the picking and packing screens show. */
+  async listOrders(storeId: string, query: unknown): Promise<OrderSummary[]> {
+    const { status } = parse(listOrdersSchema, query, "Invalid filter");
+    const result = await this.handle.db.execute<OrderSummary>(sql`
+      SELECT o.id AS "orderId", o.external_ref AS "externalRef", o.status, o.created_at AS "createdAt",
+             count(i.id)::int AS "lineCount",
+             coalesce(sum(i.requested_qty), 0)::int AS "requestedUnits",
+             coalesce(sum(i.picked_qty), 0)::int AS "pickedUnits",
+             (SELECT count(*)::int FROM order_item_shortages s JOIN order_items si ON si.id = s.order_item_id
+              WHERE si.order_id = o.id AND s.status = 'open') AS "openShortages"
+      FROM orders o
+      LEFT JOIN order_items i ON i.order_id = o.id
+      WHERE o.store_id = ${storeId}
+        AND o.status IN (${sql.join(
+          status.map((st) => sql`${st}`),
+          sql`, `,
+        )})
+      GROUP BY o.id
+      ORDER BY o.created_at, o.id
+      LIMIT 200`);
+    return result.rows;
+  }
+
   async getOrder(storeId: string, orderId: string): Promise<OrderView> {
     const { db } = this.handle;
     const [order] = await db
