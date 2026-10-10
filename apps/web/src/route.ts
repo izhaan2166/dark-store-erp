@@ -19,6 +19,8 @@ export type Route =
   | { screen: "stock"; storeId: string }
   | { screen: "products"; storeId: string }
   | { screen: "shelves"; storeId: string }
+  | { screen: "orders"; storeId: string }
+  | { screen: "new-order"; storeId: string }
   | { screen: "shelf"; storeId: string; locationId: string };
 
 export function parseRoute(hash: string): Route {
@@ -27,6 +29,7 @@ export function parseRoute(hash: string): Route {
   if (root !== "stores" || !storeId || extra) return { screen: "stores" };
   if (job === "pick" || job === "pack") return id ? { screen: "order", job, storeId, orderId: id } : { screen: "queue", job, storeId };
   if (job === "count") return id ? { screen: "shelf", storeId, locationId: id } : { screen: "count", storeId };
+  if (job === "orders") return id === "new" ? { screen: "new-order", storeId } : id ? { screen: "stores" } : { screen: "orders", storeId };
   if (job === "receive") return id ? { screen: "receipt", storeId, purchaseOrderId: id } : { screen: "receive", storeId };
   if ((job === "shortages" || job === "putaway" || job === "approvals" || job === "stock" || job === "products" || job === "shelves") && !id) return { screen: job, storeId };
   return { screen: "stores" };
@@ -60,6 +63,10 @@ export function href(route: Route): string {
       return `#/stores/${route.storeId}/shelves`;
     case "shelf":
       return `#/stores/${route.storeId}/count/${route.locationId}`;
+    case "orders":
+      return `#/stores/${route.storeId}/orders`;
+    case "new-order":
+      return `#/stores/${route.storeId}/orders/new`;
   }
 }
 
@@ -89,6 +96,9 @@ export function permissionFor(route: Route): string | null {
       return "catalog.manage";
     case "shelves":
       return "locations.manage";
+    case "orders":
+    case "new-order":
+      return "orders.create";
   }
 }
 

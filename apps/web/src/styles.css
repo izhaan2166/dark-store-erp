@@ -121,3 +121,4 @@ section > .bar h2 { flex: 1; margin: 0.6rem 0; }
 .tags .tag button { min-height: 0; padding: 0 4px; border: 0; background: none; }
 .row .jobs { margin-left: auto; }
 .row .jobs button { margin-left: 0; }
+.row input.qty { width: 6rem; flex: 0 0 auto; }

@@ -106,6 +106,14 @@ export interface OpenShortage {
   escalatedAt: string | null;
 }
 
+/** What accepting an order reserved: a line's shortQty is waiting under Missing items. */
+export interface AcceptedOrder {
+  orderId: string;
+  status: string;
+  fullyReserved: boolean;
+  lines: { productId: string; requestedQty: number; reservedQty: number; shortQty: number }[];
+}
+
 export interface ProductStock {
   productId: string;
   availableToPromise: number;
@@ -293,6 +301,14 @@ export class Api {
 
   orders(storeId: string, status = "accepted,picking"): Promise<OrderSummary[]> {
     return this.call("GET", `/stores/${storeId}/orders?status=${encodeURIComponent(status)}`);
+  }
+
+  acceptOrder(storeId: string, body: { externalRef: string; lines: { productId: string; quantity: number }[] }, key: string): Promise<AcceptedOrder> {
+    return this.call("POST", `/stores/${storeId}/orders`, { body, key });
+  }
+
+  cancelOrder(storeId: string, orderId: string, reason: string, key: string): Promise<unknown> {
+    return this.call("POST", `/stores/${storeId}/orders/${orderId}/cancel`, { body: { reason }, key });
   }
 
   fulfilment(storeId: string, orderId: string): Promise<FulfilmentView> {

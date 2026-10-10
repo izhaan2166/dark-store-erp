@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Api, type Session } from "./api";
 import { permissionFor, useRoute } from "./route";
 import { OrderQueue } from "./screens/OrderQueue";
+import { NewOrder, Orders } from "./screens/Orders";
 import { PackOrder } from "./screens/PackOrder";
 import { PickOrder } from "./screens/PickOrder";
 import { Products } from "./screens/Products";
@@ -67,6 +68,10 @@ export function App() {
         <Approvals api={api} storeId={route.storeId} />
       ) : route.screen === "stock" ? (
         <StockControl api={api} storeId={route.storeId} />
+      ) : route.screen === "orders" ? (
+        <Orders api={api} storeId={route.storeId} canCancel={store?.permissions.includes("orders.cancel") ?? false} />
+      ) : route.screen === "new-order" ? (
+        <NewOrder api={api} storeId={route.storeId} />
       ) : route.screen === "products" ? (
         <Products api={api} storeId={route.storeId} />
       ) : route.screen === "shelves" ? (
