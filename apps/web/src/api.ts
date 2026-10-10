@@ -184,6 +184,18 @@ export interface NewPurchaseOrder {
   lines: { productId: string; quantity: number; unitCostPaise: number }[];
 }
 
+/** One shelf's counted stock when the store starts using the system. */
+export interface OpeningStock {
+  locationId: string;
+  lines: { productId: string; quantity: number; lotCode?: string; expiryDate?: string; unitCostPaise?: number }[];
+}
+
+export interface OpeningStockResult {
+  openingStockId: string;
+  locationId: string;
+  lines: { productId: string; batchId: string | null; quantity: number }[];
+}
+
 export interface PurchaseOrderSummary {
   purchaseOrderId: string;
   poNumber: string;
@@ -458,6 +470,10 @@ export class Api {
 
   createSupplier(storeId: string, body: { code: string; name: string }, key: string): Promise<{ supplierId: string }> {
     return this.call("POST", `/stores/${storeId}/suppliers`, { body, key });
+  }
+
+  loadOpeningStock(storeId: string, body: OpeningStock, key: string): Promise<OpeningStockResult> {
+    return this.call("POST", `/stores/${storeId}/opening-stock`, { body, key });
   }
 
   createPurchaseOrder(storeId: string, body: NewPurchaseOrder, key: string): Promise<PurchaseOrderView> {

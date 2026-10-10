@@ -23,6 +23,7 @@ export type Route =
   | { screen: "shelves"; storeId: string }
   | { screen: "orders"; storeId: string }
   | { screen: "new-order"; storeId: string }
+  | { screen: "opening-stock"; storeId: string }
   | { screen: "shelf"; storeId: string; locationId: string };
 
 export function parseRoute(hash: string): Route {
@@ -33,6 +34,7 @@ export function parseRoute(hash: string): Route {
   if (job === "count") return id ? { screen: "shelf", storeId, locationId: id } : { screen: "count", storeId };
   if (job === "orders") return id === "new" ? { screen: "new-order", storeId } : id ? { screen: "stores" } : { screen: "orders", storeId };
   if (job === "receive") return id === "new" ? { screen: "new-purchase-order", storeId } : id ? { screen: "receipt", storeId, purchaseOrderId: id } : { screen: "receive", storeId };
+  if (job === "opening-stock" && !id) return { screen: "opening-stock", storeId };
   if ((job === "shortages" || job === "putaway" || job === "approvals" || job === "stock" || job === "products" || job === "shelves" || job === "dashboard") && !id) return { screen: job, storeId };
   return { screen: "stores" };
 }
@@ -73,6 +75,8 @@ export function href(route: Route): string {
       return `#/stores/${route.storeId}/orders`;
     case "new-order":
       return `#/stores/${route.storeId}/orders/new`;
+    case "opening-stock":
+      return `#/stores/${route.storeId}/opening-stock`;
   }
 }
 
@@ -109,6 +113,8 @@ export function permissionFor(route: Route): string | null {
     case "orders":
     case "new-order":
       return "orders.create";
+    case "opening-stock":
+      return "inventory.opening_stock";
   }
 }
 

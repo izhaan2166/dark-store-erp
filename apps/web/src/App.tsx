@@ -8,6 +8,7 @@ import { PickOrder } from "./screens/PickOrder";
 import { Products } from "./screens/Products";
 import { Putaway } from "./screens/Putaway";
 import { NewPurchaseOrder } from "./screens/NewPurchaseOrder";
+import { OpeningStock } from "./screens/OpeningStock";
 import { ReceiveList } from "./screens/ReceiveList";
 import { ReceiveOrder } from "./screens/ReceiveOrder";
 import { Shelves } from "./screens/Shelves";
@@ -82,6 +83,8 @@ export function App() {
         <Products api={api} storeId={route.storeId} />
       ) : route.screen === "shelves" ? (
         <Shelves api={api} storeId={route.storeId} />
+      ) : route.screen === "opening-stock" ? (
+        <OpeningStock api={api} storeId={route.storeId} />
       ) : route.screen === "shelf" ? (
         <CountShelf key={route.locationId} api={api} storeId={route.storeId} locationId={route.locationId} />
       ) : route.screen === "queue" ? (

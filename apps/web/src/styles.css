@@ -65,6 +65,9 @@ fieldset { border: 1px solid var(--line); border-radius: 10px; }
 .row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 14px 4px;
   border-bottom: 1px solid var(--line); color: var(--text); text-decoration: none; }
 .row strong { flex: 1 0 100%; }
+button.row { width: 100%; justify-content: flex-start; text-align: left; min-height: 0; background: none;
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
+button.row strong { flex: 1; }
 
 .scan { margin: 8px 0 12px; }
 .scan input { font-size: 1.2rem; min-height: 56px; border-width: 2px; border-color: var(--green); }
