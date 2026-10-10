@@ -4,9 +4,11 @@ import { permissionFor, useRoute } from "./route";
 import { OrderQueue } from "./screens/OrderQueue";
 import { PackOrder } from "./screens/PackOrder";
 import { PickOrder } from "./screens/PickOrder";
+import { Products } from "./screens/Products";
 import { Putaway } from "./screens/Putaway";
 import { ReceiveList } from "./screens/ReceiveList";
 import { ReceiveOrder } from "./screens/ReceiveOrder";
+import { Shelves } from "./screens/Shelves";
 import { Shortages } from "./screens/Shortages";
 import { SignIn } from "./screens/SignIn";
 import { Approvals } from "./screens/Approvals";
@@ -65,6 +67,10 @@ export function App() {
         <Approvals api={api} storeId={route.storeId} />
       ) : route.screen === "stock" ? (
         <StockControl api={api} storeId={route.storeId} />
+      ) : route.screen === "products" ? (
+        <Products api={api} storeId={route.storeId} />
+      ) : route.screen === "shelves" ? (
+        <Shelves api={api} storeId={route.storeId} />
       ) : route.screen === "shelf" ? (
         <CountShelf key={route.locationId} api={api} storeId={route.storeId} locationId={route.locationId} />
       ) : route.screen === "queue" ? (

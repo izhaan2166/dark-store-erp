@@ -1,7 +1,7 @@
 import type { Session } from "../api";
 import { href } from "../route";
 
-const JOB_PERMISSIONS = ["orders.pick", "orders.pack", "orders.resolve_shortage", "receiving.record", "inventory.putaway", "inventory.count", "inventory.adjust", "inventory.approve_request"];
+const JOB_PERMISSIONS = ["orders.pick", "orders.pack", "orders.resolve_shortage", "receiving.record", "inventory.putaway", "inventory.count", "inventory.adjust", "inventory.approve_request", "catalog.manage", "locations.manage"];
 
 /** Where the user works. Only the jobs their roles allow are offered. */
 export function Stores(props: { session: Session }) {
@@ -60,6 +60,16 @@ export function Stores(props: { session: Session }) {
             {store.permissions.includes("orders.resolve_shortage") && (
               <a className="button" href={href({ screen: "shortages", storeId: store.storeId })}>
                 Missing items
+              </a>
+            )}
+            {store.permissions.includes("catalog.manage") && (
+              <a className="button" href={href({ screen: "products", storeId: store.storeId })}>
+                Products
+              </a>
+            )}
+            {store.permissions.includes("locations.manage") && (
+              <a className="button" href={href({ screen: "shelves", storeId: store.storeId })}>
+                Shelves
               </a>
             )}
             {!JOB_PERMISSIONS.some((p) => store.permissions.includes(p)) && (

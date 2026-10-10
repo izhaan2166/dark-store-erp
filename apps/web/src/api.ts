@@ -66,6 +66,31 @@ export interface Product {
   batchTracked?: boolean;
 }
 
+/** A product as the catalogue screens edit it. */
+export interface ProductDetail extends Product {
+  category: string;
+  unitOfMeasure: string;
+  batchTracked: boolean;
+  status: "active" | "inactive";
+  barcodes: string[];
+}
+
+export interface NewProduct {
+  sku: string;
+  name: string;
+  category: string;
+  unitOfMeasure: string;
+  batchTracked: boolean;
+  barcodes: string[];
+}
+
+export interface NewLocation {
+  code: string;
+  kind: "zone" | "rack" | "shelf" | "bin";
+  purpose: "storage" | "receiving" | "packing" | "quarantine";
+  allocatable?: boolean;
+}
+
 export interface OpenShortage {
   shortageId: string;
   orderId: string;
@@ -158,6 +183,8 @@ export interface Location {
   code: string;
   purpose: string;
   status: string;
+  kind?: string;
+  allocatable?: boolean;
 }
 
 export interface StockRow {
@@ -417,11 +444,42 @@ export class Api {
     return this.call("POST", `/stores/${storeId}/stock-requests/write-off`, { body, key });
   }
 
+  catalogue(storeId: string, q: string): Promise<ProductDetail[]> {
+    const query = new URLSearchParams({ limit: "50" });
+    if (q.trim()) query.set("q", q.trim());
+    return this.call<{ items: ProductDetail[] }>("GET", `/stores/${storeId}/products?${query}`).then((r) => r.items);
+  }
+
+  createProduct(storeId: string, body: NewProduct, key: string): Promise<ProductDetail> {
+    return this.call("POST", `/stores/${storeId}/products`, { body, key });
+  }
+
+  updateProduct(
+    storeId: string,
+    productId: string,
+    body: Partial<Pick<ProductDetail, "name" | "category" | "unitOfMeasure" | "status">>,
+    key: string,
+  ): Promise<ProductDetail> {
+    return this.call("PATCH", `/stores/${storeId}/products/${productId}`, { body, key });
+  }
+
+  addBarcode(storeId: string, productId: string, barcode: string, key: string): Promise<ProductDetail> {
+    return this.call("POST", `/stores/${storeId}/products/${productId}/barcodes`, { body: { barcode }, key });
+  }
+
+  createLocation(storeId: string, body: NewLocation, key: string): Promise<Location> {
+    return this.call("POST", `/stores/${storeId}/locations`, { body, key });
+  }
+
+  updateLocation(storeId: string, locationId: string, body: { status?: string; allocatable?: boolean }, key: string): Promise<Location> {
+    return this.call("PATCH", `/stores/${storeId}/locations/${locationId}`, { body, key });
+  }
+
   /**
    * Sends one request. A write is retried once with the same key if the
    * network drops, so a scan that reached the server is never applied twice.
    */
-  private async call<T>(method: "GET" | "POST", path: string, opts: { body?: unknown; key?: string } = {}): Promise<T> {
+  private async call<T>(method: "GET" | "POST" | "PATCH", path: string, opts: { body?: unknown; key?: string } = {}): Promise<T> {
     const headers: Record<string, string> = { Accept: "application/json" };
     if (opts.body !== undefined) headers["Content-Type"] = "application/json";
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
