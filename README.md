@@ -112,6 +112,8 @@ k6 run -e API_URL=http://localhost:3001 -e ORDERS_PER_HOUR=240 -e STAFF=30 k6.js
 DATABASE_URL=postgres://…/erp_loadtest pnpm --filter @dse/api reconcile --store LOAD-…
 ```
 
+Pilot set-up, device testing and the nightly checks are in [docs/pilot.md](docs/pilot.md).
+
 Each run lasts 15 minutes (`-e DURATION=…` to change). It passes when every screen's p95 is under 2 seconds, no request gets a server error, and `reconcile` finds no differences.
 
 ## Changing the schema
