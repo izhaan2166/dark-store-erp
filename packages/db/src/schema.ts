@@ -86,6 +86,10 @@ export const purchaseOrderStatus = pgEnum("purchase_order_status", ["open", "rec
 
 export const goodsReceiptStatus = pgEnum("goods_receipt_status", ["pending_approval", "posted", "cancelled"]);
 
+export const stockRequestKind = pgEnum("stock_request_kind", ["release", "write_off"]);
+
+export const stockRequestStatus = pgEnum("stock_request_status", ["pending_approval", "approved", "rejected"]);
+
 export const stockCountStatus = pgEnum("stock_count_status", ["pending_approval", "posted", "rejected"]);
 
 export const receivingDiscrepancyKind = pgEnum("receiving_discrepancy_kind", [
@@ -707,6 +711,60 @@ export const stockCountLines = pgTable(
     check(
       "stock_count_lines_quantities",
       sql`${t.bookQty} >= 0 AND ${t.blockedQty} >= 0 AND ${t.blockedQty} <= ${t.bookQty} AND ${t.countedQty} >= 0`,
+    ),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Quarantine release and write-off requests
+// ---------------------------------------------------------------------------
+
+/**
+ * A request that always needs a Store Manager: put blocked stock back on sale
+ * (`release`) or remove stock from the books (`write_off`). Stock moves only
+ * when it is approved.
+ */
+export const stockRequests = pgTable(
+  "stock_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id),
+    kind: stockRequestKind("kind").notNull(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    batchId: uuid("batch_id").references(() => batches.id),
+    fromLocationId: uuid("from_location_id")
+      .notNull()
+      .references(() => locations.id),
+    fromStatus: stockStatus("from_status").notNull(),
+    /** Where released stock goes back on sale; null for a write-off. */
+    toLocationId: uuid("to_location_id").references(() => locations.id),
+    quantity: integer("quantity").notNull(),
+    reason: text("reason").notNull(),
+    status: stockRequestStatus("status").notNull().default("pending_approval"),
+    requestedBy: uuid("requested_by")
+      .notNull()
+      .references(() => users.id),
+    decidedBy: uuid("decided_by").references(() => users.id),
+    decisionReason: text("decision_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("stock_requests_store_status_idx").on(t.storeId, t.status),
+    check("stock_requests_quantity_positive", sql`${t.quantity} > 0`),
+    check(
+      "stock_requests_shape",
+      sql`(${t.kind} = 'release' AND ${t.toLocationId} IS NOT NULL AND ${t.fromStatus} <> 'available')
+        OR (${t.kind} = 'write_off' AND ${t.toLocationId} IS NULL)`,
+    ),
+    check(
+      "stock_requests_decision_recorded",
+      sql`${t.status} = 'pending_approval'
+        OR (${t.decidedBy} IS NOT NULL AND ${t.decisionReason} IS NOT NULL AND ${t.decidedAt} IS NOT NULL)`,
     ),
   ],
 );

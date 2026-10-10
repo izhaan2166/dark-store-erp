@@ -72,3 +72,13 @@ Implemented in `apps/api/src/inventory/counts.service.ts`.
 | (new, outside thresholds or releasing blocked units) | `pending_approval` |
 | `pending_approval` | `posted` (Store Manager approves with a reason), `rejected` (Store Manager rejects with a reason) |
 | `posted`, `rejected` | none |
+
+## Release and write-off requests
+
+Implemented in `apps/api/src/inventory/stock-control.service.ts`. Stock moves only on approval.
+
+| From | Allowed to |
+| --- | --- |
+| (new) | `pending_approval` |
+| `pending_approval` | `approved` (Store Manager approves with a reason), `rejected` (Store Manager rejects with a reason) |
+| `approved`, `rejected` | none |

@@ -68,6 +68,14 @@ Frozen on 10 Oct 2026. Change them only when implementation or testing shows a r
 - Within the count-variance thresholds below the count posts at once; otherwise it waits for a Store Manager to approve or reject it with a reason. The unit cost used is the product's moving average when the count is submitted.
 - A count never removes units that orders have reserved. If the shelf holds fewer than are reserved, the count is refused and the picker reports a short pick first.
 
+## Quarantine and write-offs
+
+- Anyone with `inventory.adjust` can block free stock at once: a `status_change` movement from `available` in a storage bin to `quarantined` in a quarantine area, with a reason and an audit record. Blocking only makes less stock sellable, so it needs no approval.
+- Putting blocked stock back on sale and writing stock off are requests (`stock_requests`). Stock moves only when a Store Manager approves with a reason; a rejection changes nothing. Both decisions are audited.
+- A release goes from `quarantined` to `available` in a storage bin; short-picked units can be released in the bin where they sit. An expired batch can never be released, only written off.
+- A write-off can take `available`, `quarantined`, `damaged` or `expired` stock out of the books with a `write_off` movement.
+- Neither blocking nor a write-off ever touches units that orders have reserved; those must be short-picked first. A request does not hold stock while it waits, so the ledger checks again on approval.
+
 ## Approval thresholds
 
 Editable defaults in `store_settings`:
