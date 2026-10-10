@@ -57,6 +57,13 @@
       "when": 1791654028985,
       "tag": "0007_worker_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791654865056,
+      "tag": "0008_substitutions",
+      "breakpoints": true
     }
   ]
 }
