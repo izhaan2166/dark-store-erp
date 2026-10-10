@@ -46,6 +46,11 @@ Sign in with `POST /auth/login` (`{ "email", "password" }`) and send the returne
 | `POST /stores/:storeId/stock-counts` (`{ "locationId", "lines": [{ "productId", "batchId", "countedQty" }] }`) | `inventory.count` |
 | `GET /stores/:storeId/stock-counts/:stockCountId` | `inventory.view` |
 | `POST …/stock-counts/:stockCountId/approve` or `/reject` (`{ "reason" }`) | `inventory.approve_count` |
+| `POST /stores/:storeId/quarantines` (`{ "productId", "batchId", "fromLocationId", "toLocationId", "quantity", "reason" }`) | `inventory.adjust` |
+| `POST /stores/:storeId/stock-requests/release` (same body as a quarantine) | `inventory.adjust` |
+| `POST /stores/:storeId/stock-requests/write-off` (`{ "productId", "batchId", "locationId", "status", "quantity", "reason" }`) | `inventory.adjust` |
+| `GET /stores/:storeId/stock-requests?status=pending_approval` and `GET …/stock-requests/:requestId` | `inventory.view` |
+| `POST …/stock-requests/:requestId/approve` or `/reject` (`{ "reason" }`) | `inventory.approve_request` |
 | `POST /stores/:storeId/orders` | `orders.create` |
 | `GET /stores/:storeId/orders/:orderId` | `orders.view` |
 | `POST /stores/:storeId/orders/:orderId/cancel` (`{ "reason" }`) | `orders.cancel` |

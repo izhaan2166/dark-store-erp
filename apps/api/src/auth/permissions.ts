@@ -20,6 +20,8 @@ export const PERMISSIONS = [
   "inventory.putaway",
   "inventory.count",
   "inventory.approve_count",
+  "inventory.adjust",
+  "inventory.approve_request",
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -41,6 +43,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "receiving.record",
     "inventory.putaway",
     "inventory.count",
+    "inventory.adjust",
   ],
   receiving_staff: ["catalog.view", "inventory.view", "purchasing.view", "receiving.record", "inventory.putaway"],
   picker: ["catalog.view", "inventory.view", "orders.view", "orders.pick"],
