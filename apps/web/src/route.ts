@@ -13,13 +13,16 @@ export type Route =
   | { screen: "shortages"; storeId: string }
   | { screen: "receive"; storeId: string }
   | { screen: "receipt"; storeId: string; purchaseOrderId: string }
-  | { screen: "putaway"; storeId: string };
+  | { screen: "putaway"; storeId: string }
+  | { screen: "count"; storeId: string }
+  | { screen: "shelf"; storeId: string; locationId: string };
 
 export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   const [root, storeId, job, id, extra] = parts;
   if (root !== "stores" || !storeId || extra) return { screen: "stores" };
   if (job === "pick" || job === "pack") return id ? { screen: "order", job, storeId, orderId: id } : { screen: "queue", job, storeId };
+  if (job === "count") return id ? { screen: "shelf", storeId, locationId: id } : { screen: "count", storeId };
   if (job === "receive") return id ? { screen: "receipt", storeId, purchaseOrderId: id } : { screen: "receive", storeId };
   if ((job === "shortages" || job === "putaway") && !id) return { screen: job, storeId };
   return { screen: "stores" };
@@ -41,6 +44,10 @@ export function href(route: Route): string {
       return `#/stores/${route.storeId}/receive/${route.purchaseOrderId}`;
     case "putaway":
       return `#/stores/${route.storeId}/putaway`;
+    case "count":
+      return `#/stores/${route.storeId}/count`;
+    case "shelf":
+      return `#/stores/${route.storeId}/count/${route.locationId}`;
   }
 }
 
@@ -59,6 +66,9 @@ export function permissionFor(route: Route): string | null {
       return "receiving.record";
     case "putaway":
       return "inventory.putaway";
+    case "count":
+    case "shelf":
+      return "inventory.count";
   }
 }
 

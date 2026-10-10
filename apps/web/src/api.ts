@@ -63,6 +63,7 @@ export interface Product {
   productId: string;
   sku: string;
   name: string;
+  batchTracked?: boolean;
 }
 
 export interface OpenShortage {
@@ -138,6 +139,18 @@ export interface ReceiptView {
   receivingLocationId: string;
   lines: { productId: string; expectedQty: number; acceptedQty: number; needsApproval: boolean }[];
   discrepancies: { goodsReceiptLineId: string; kind: string; quantity: number }[];
+}
+
+export interface CountLine {
+  productId: string;
+  batchId: string | null;
+  countedQty: number;
+}
+
+export interface CountView {
+  stockCountId: string;
+  status: "pending_approval" | "posted" | "rejected";
+  lines: { productId: string; batchId: string | null; bookQty: number; countedQty: number; variance: number; needsApproval: boolean }[];
 }
 
 export interface Location {
@@ -275,7 +288,7 @@ export class Api {
     return this.call("GET", `/stores/${storeId}/locations`);
   }
 
-  stockRows(storeId: string, filter: { status?: string; productId?: string }): Promise<StockRow[]> {
+  stockRows(storeId: string, filter: { status?: string; productId?: string; locationId?: string }): Promise<StockRow[]> {
     const query = new URLSearchParams({ limit: "500" });
     for (const [name, value] of Object.entries(filter)) if (value) query.set(name, value);
     return this.call<{ items: StockRow[] }>("GET", `/stores/${storeId}/inventory?${query}`).then((r) => r.items);
@@ -287,6 +300,10 @@ export class Api {
     key: string,
   ): Promise<{ putawayId: string }> {
     return this.call("POST", `/stores/${storeId}/putaways`, { body, key });
+  }
+
+  submitCount(storeId: string, body: { locationId: string; lines: CountLine[] }, key: string): Promise<CountView> {
+    return this.call("POST", `/stores/${storeId}/stock-counts`, { body, key });
   }
 
   /**

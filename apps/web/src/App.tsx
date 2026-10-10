@@ -9,6 +9,7 @@ import { ReceiveList } from "./screens/ReceiveList";
 import { ReceiveOrder } from "./screens/ReceiveOrder";
 import { Shortages } from "./screens/Shortages";
 import { SignIn } from "./screens/SignIn";
+import { CountShelf, CountStart } from "./screens/StockCount";
 import { Stores } from "./screens/Stores";
 import { loadSession, saveSession } from "./session";
 
@@ -56,6 +57,10 @@ export function App() {
         <ReceiveOrder key={route.purchaseOrderId} api={api} storeId={route.storeId} purchaseOrderId={route.purchaseOrderId} />
       ) : route.screen === "putaway" ? (
         <Putaway api={api} storeId={route.storeId} />
+      ) : route.screen === "count" ? (
+        <CountStart api={api} storeId={route.storeId} />
+      ) : route.screen === "shelf" ? (
+        <CountShelf key={route.locationId} api={api} storeId={route.storeId} locationId={route.locationId} />
       ) : route.screen === "queue" ? (
         <OrderQueue key={route.job} api={api} storeId={route.storeId} job={route.job} />
       ) : route.job === "pick" ? (
