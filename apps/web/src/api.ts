@@ -116,6 +116,18 @@ export type Resolution =
   | { resolution: "remove"; reason: string }
   | { resolution: "substitute"; reason: string; substituteProductId: string; quantity: number };
 
+export interface Supplier {
+  supplierId: string;
+  code: string;
+  name: string;
+}
+
+export interface NewPurchaseOrder {
+  supplierId: string;
+  poNumber: string;
+  lines: { productId: string; quantity: number; unitCostPaise: number }[];
+}
+
 export interface PurchaseOrderSummary {
   purchaseOrderId: string;
   poNumber: string;
@@ -358,6 +370,18 @@ export class Api {
 
   purchaseOrders(storeId: string): Promise<PurchaseOrderSummary[]> {
     return this.call("GET", `/stores/${storeId}/purchase-orders?status=open`);
+  }
+
+  suppliers(storeId: string): Promise<Supplier[]> {
+    return this.call("GET", `/stores/${storeId}/suppliers`);
+  }
+
+  createSupplier(storeId: string, body: { code: string; name: string }, key: string): Promise<{ supplierId: string }> {
+    return this.call("POST", `/stores/${storeId}/suppliers`, { body, key });
+  }
+
+  createPurchaseOrder(storeId: string, body: NewPurchaseOrder, key: string): Promise<PurchaseOrderView> {
+    return this.call("POST", `/stores/${storeId}/purchase-orders`, { body, key });
   }
 
   purchaseOrder(storeId: string, purchaseOrderId: string): Promise<PurchaseOrderView> {

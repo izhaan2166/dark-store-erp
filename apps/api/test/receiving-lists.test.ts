@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { products } from "@dse/db";
+import { products, suppliers } from "@dse/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { actor, createContext, createProduct, createStore, type TestContext, type TestStore } from "./support/fixtures";
 import { startServer, type TestServer } from "./support/http";
@@ -91,6 +91,26 @@ describe("purchase orders for the receiving screen", () => {
   });
 });
 
+describe("suppliers for the purchase order screen", () => {
+  it("lists this store's active suppliers by name", async () => {
+    const own = await createStore(ctx);
+    const other = await createStore(ctx);
+    const add = async (s: TestStore, name: string) =>
+      (await ctx.purchasing.createSupplier(actor(s), { code: `SUP-${randomUUID().slice(0, 6)}`, name })).supplierId;
+    const veg = await add(own, "Veg Mandi");
+    const dairy = await add(own, "Amul Dairy");
+    const closed = await add(own, "Closed Co");
+    await add(other, "Elsewhere Ltd");
+    await ctx.handle.db.update(suppliers).set({ status: "inactive" }).where(eq(suppliers.id, closed));
+    const list = await ctx.purchasing.listSuppliers(own.storeId);
+    expect(list.map((s) => [s.supplierId, s.name])).toEqual([
+      [dairy, "Amul Dairy"],
+      [veg, "Veg Mandi"],
+    ]);
+    expect(list[0]!.code).toMatch(/^SUP-/);
+  });
+});
+
 describe("purchase order list over HTTP", () => {
   let server: TestServer;
   beforeAll(async () => {
@@ -106,6 +126,11 @@ describe("purchase order list over HTTP", () => {
     const res = await server.request("GET", path, { token: receiver });
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
+    const suppliersPath = `/stores/${store.storeId}/suppliers`;
+    expect((await server.request("GET", suppliersPath, { token: picker })).status).toBe(403);
+    expect((await server.request("GET", suppliersPath, { token: receiver })).body).toContainEqual(
+      expect.objectContaining({ supplierId, name: "Fresh Farms" }),
+    );
   });
 
   it("names the product on each stock row", async () => {

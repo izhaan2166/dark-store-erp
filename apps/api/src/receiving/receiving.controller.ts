@@ -29,6 +29,12 @@ export class ReceivingController {
     return this.purchasing.createSupplier(actorFor(user, storeId, key), body);
   }
 
+  @Get("suppliers")
+  @RequirePermission("purchasing.view")
+  listSuppliers(@Param("storeId") storeId: string) {
+    return this.purchasing.listSuppliers(storeId);
+  }
+
   @Post("purchase-orders")
   @RequirePermission("purchasing.manage")
   createPurchaseOrder(

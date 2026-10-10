@@ -5,7 +5,7 @@ import { href } from "../route";
 const REFRESH_MS = 30_000;
 
 /** Purchase orders still expected, oldest first. The receiver opens the one being delivered. */
-export function ReceiveList(props: { api: Api; storeId: string }) {
+export function ReceiveList(props: { api: Api; storeId: string; canOrder?: boolean }) {
   const { api, storeId } = props;
   const [orders, setOrders] = useState<PurchaseOrderSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +30,13 @@ export function ReceiveList(props: { api: Api; storeId: string }) {
       <header className="bar">
         <a href={href({ screen: "stores" })}>‹ Jobs</a>
         <h1>Deliveries</h1>
-        <button onClick={() => void load()}>Refresh</button>
+        {props.canOrder ? (
+          <a className="button" href={href({ screen: "new-purchase-order", storeId })}>
+            New purchase order
+          </a>
+        ) : (
+          <button onClick={() => void load()}>Refresh</button>
+        )}
       </header>
       {error && <p className="error" role="alert">{error}</p>}
       {orders === null && !error && <p className="muted">Loading…</p>}
