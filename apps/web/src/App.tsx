@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Api, type Session } from "./api";
 import { permissionFor, useRoute } from "./route";
 import { OrderQueue } from "./screens/OrderQueue";
@@ -13,6 +13,7 @@ import { ReceiveList } from "./screens/ReceiveList";
 import { ReceiveOrder } from "./screens/ReceiveOrder";
 import { Shelves } from "./screens/Shelves";
 import { Shortages } from "./screens/Shortages";
+import { Staff } from "./screens/Staff";
 import { SignIn } from "./screens/SignIn";
 import { Approvals } from "./screens/Approvals";
 import { Dashboard } from "./screens/Dashboard";
@@ -29,7 +30,32 @@ export function App() {
     saveSession(null);
     setSession(null);
   };
-  const api = useMemo(() => new Api(session?.token ?? null, signOut), [session]);
+  const token = session?.token ?? null;
+  const api = useMemo(() => new Api(token, signOut), [token]);
+
+  // Roles can change while someone is signed in, and a new password ends the
+  // session. Ask again when the app opens and each time the jobs screen shows;
+  // a 401 signs the person out.
+  const onJobs = route.screen === "stores";
+  useEffect(() => {
+    if (!token) return;
+    let live = true;
+    api.me().then(
+      (me) => {
+        if (!live) return;
+        setSession((current) => {
+          if (!current || current.token !== token) return current;
+          const next = { ...current, user: me.user, stores: me.stores };
+          saveSession(next);
+          return next;
+        });
+      },
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, token, onJobs]);
 
   if (!session) {
     return (
@@ -83,6 +109,8 @@ export function App() {
         <Products api={api} storeId={route.storeId} />
       ) : route.screen === "shelves" ? (
         <Shelves api={api} storeId={route.storeId} />
+      ) : route.screen === "staff" ? (
+        <Staff api={api} storeId={route.storeId} meId={session.user.id} />
       ) : route.screen === "opening-stock" ? (
         <OpeningStock api={api} storeId={route.storeId} />
       ) : route.screen === "shelf" ? (

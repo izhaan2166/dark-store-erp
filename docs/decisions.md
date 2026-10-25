@@ -15,6 +15,7 @@ Frozen on 10 Oct 2026. Change them only when implementation or testing shows a r
 - Email and password sign-in. Passwords are hashed with scrypt; the API returns an opaque bearer token and stores only its SHA-256 hash. Sessions last 12 hours and can be revoked.
 - Roles (Super Admin, Store Manager, Inventory Manager, Receiving Staff, Picker, Packer, Auditor) are granted per store, and one person may hold several. Each role maps to permissions in code; the backend checks them on every request and reads roles fresh each time, so removing a role takes effect immediately.
 - Every route is private unless marked public. A route under `/stores/:storeId` must declare a permission or it is refused. A user with no role in a store gets `404`, the same as a store that does not exist.
+- Store Managers manage their store's staff in the app (`staff.manage`): add a person with a first password, replace their roles in this store (none removes them from it), or set a new password, which ends all their sessions. They cannot change themselves, a Super Admin, or anyone who also has a role in another store; Super Admin is granted only with the `create-user` command. Passwords never enter the idempotency fingerprint or the audit log.
 
 ## Inventory model
 

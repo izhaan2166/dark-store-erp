@@ -38,7 +38,7 @@ Done when a restored backup opens in staging and the first nightly `reconcile` p
 
 ## 3. Store set-up
 
-1. Create the first admin with `create-user` (see the README), then sign in and add the other staff with their roles. Give at least one person Store Manager: only a Store Manager approves write-offs, quarantine releases, large count differences (more than 2 units or ₹1,000 per product) and receiving differences over 5%.
+1. Create the first admin with `create-user` (see the README), then sign in and add the other staff on the **Staff** screen with a first password and their roles. Tell each person their password in private. The same screen changes roles, sets a new password if someone forgets theirs, and removes people who leave. Give at least one person Store Manager: only a Store Manager approves write-offs, quarantine releases, large count differences (more than 2 units or ₹1,000 per product) and receiving differences over 5%.
 2. Add the shelves (Shelves screen; a range like A-01 to A-20 in one go), plus an unloading area for deliveries, at least one packing area and a blocked stock area.
 3. Add the products with their barcodes (Products screen). Mark products that carry lot numbers or expiry dates as batch-tracked.
 

@@ -184,6 +184,24 @@ export interface NewPurchaseOrder {
   lines: { productId: string; quantity: number; unitCostPaise: number }[];
 }
 
+export type StaffRole = "store_manager" | "inventory_manager" | "receiving_staff" | "picker" | "packer" | "auditor" | "super_admin";
+
+/** Someone who works in the store. Managers cannot change themselves, admins or people shared with another store. */
+export interface StaffMember {
+  userId: string;
+  name: string;
+  email: string;
+  roles: StaffRole[];
+  editable: boolean;
+}
+
+export interface NewStaffMember {
+  name: string;
+  email: string;
+  password: string;
+  roles: StaffRole[];
+}
+
 /** One shelf's counted stock when the store starts using the system. */
 export interface OpeningStock {
   locationId: string;
@@ -383,6 +401,11 @@ export class Api {
     return this.call("POST", "/auth/login", { body: { email, password } });
   }
 
+  /** Who is signed in and what they may do now, for when a manager has changed their roles. */
+  me(): Promise<Pick<Session, "user" | "stores">> {
+    return this.call("GET", "/auth/me");
+  }
+
   logout(): Promise<void> {
     return this.call("POST", "/auth/logout", { key: newKey() });
   }
@@ -486,6 +509,24 @@ export class Api {
 
   createSupplier(storeId: string, body: { code: string; name: string }, key: string): Promise<{ supplierId: string }> {
     return this.call("POST", `/stores/${storeId}/suppliers`, { body, key });
+  }
+
+  staff(storeId: string): Promise<StaffMember[]> {
+    return this.call("GET", `/stores/${storeId}/staff`);
+  }
+
+  addStaff(storeId: string, body: NewStaffMember, key: string): Promise<StaffMember> {
+    return this.call("POST", `/stores/${storeId}/staff`, { body, key });
+  }
+
+  /** Replaces the person's roles; none removes them from the store, and the answer is null. */
+  async setStaffRoles(storeId: string, userId: string, roles: StaffRole[], key: string): Promise<StaffMember | null> {
+    const res = await this.call<{ member: StaffMember | null }>("PUT", `/stores/${storeId}/staff/${userId}/roles`, { body: { roles }, key });
+    return res.member;
+  }
+
+  setStaffPassword(storeId: string, userId: string, password: string, key: string): Promise<unknown> {
+    return this.call("POST", `/stores/${storeId}/staff/${userId}/password`, { body: { password }, key });
   }
 
   loadOpeningStock(storeId: string, body: OpeningStock, key: string): Promise<OpeningStockResult> {
@@ -615,7 +656,7 @@ export class Api {
    * Sends one request. A write is retried once with the same key if the
    * network drops, so a scan that reached the server is never applied twice.
    */
-  private async call<T>(method: "GET" | "POST" | "PATCH", path: string, opts: { body?: unknown; key?: string } = {}): Promise<T> {
+  private async call<T>(method: "GET" | "POST" | "PATCH" | "PUT", path: string, opts: { body?: unknown; key?: string } = {}): Promise<T> {
     const headers: Record<string, string> = { Accept: "application/json" };
     if (opts.body !== undefined) headers["Content-Type"] = "application/json";
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
